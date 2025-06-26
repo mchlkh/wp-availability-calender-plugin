@@ -56,7 +56,209 @@ document.addEventListener('DOMContentLoaded', function () {
     
     const datePicker = document.getElementById('ycp-date-picker');
     const resultsContainer = document.getElementById('ycp-results');
+    const showAllBtn = document.getElementById('ycp-show-all-btn');
     let calendar;
+    
+    function fetchAllProfessionals() {
+        if (!resultsContainer) return;
+        resultsContainer.innerHTML = '<div class="ycp-loading">Alle Ladies werden geladen...</div>';
+        fetch(`${ycp_ajax.ajax_url}?action=ycp_get_all_professionals`)
+            .then(res => {
+                if (!res.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return res.text();
+            })
+            .then(html => {
+                resultsContainer.innerHTML = html;
+                // Change header text after content is loaded
+                changeHeaderText();
+                // Apply dynamic transforms based on description height
+                applyDynamicTransforms();
+            })
+            .catch(error => {
+                console.error('Error fetching all professionals:', error);
+                resultsContainer.innerHTML = '<p>Entschuldigung, es gab ein Problem beim Laden der Ladies. Bitte versuchen Sie es erneut.</p>';
+                // Change header text even if there's an error
+                changeHeaderText();
+            });
+    }
+
+    function changeHeaderText() {
+        // Try multiple times with increasing delays to ensure it works
+        const attempts = [100, 300, 500, 1000];
+        
+        attempts.forEach(delay => {
+            setTimeout(() => {
+                const headerTitle = document.querySelector('.ycp-calendar-header h3');
+                console.log(`Attempt after ${delay}ms - Header element found:`, headerTitle); // Debug log
+                
+                if (headerTitle && headerTitle.textContent === 'Heute anwesend') {
+                    headerTitle.textContent = 'Die gesamte Royal Crew';
+                    console.log(`Header text changed to "Die gesamte Royal Crew" after ${delay}ms`); // Debug log
+                } else if (headerTitle) {
+                    console.log(`Header already changed or different text: "${headerTitle.textContent}"`);
+                } else {
+                    console.log(`Header element not found after ${delay}ms - trying alternative selectors`);
+                    // Try alternative selectors
+                    const altHeader1 = document.querySelector('h3');
+                    console.log('Alt header 1:', altHeader1);
+                    if (altHeader1 && altHeader1.textContent === 'Heute anwesend') {
+                        altHeader1.textContent = 'Die gesamte Royal Crew';
+                        console.log(`Header text changed using alt selector after ${delay}ms`);
+                    }
+                }
+            }, delay);
+        });
+    }
+
+    /**
+     * Dynamically calculate and apply transform values based on description text height
+     */
+    function applyDynamicTransforms() {
+        const professionalCards = document.querySelectorAll('.ycp-pro');
+        console.log(`Applying dynamic transforms to ${professionalCards.length} professional cards`);
+        
+        // Remove any existing dynamic transform styles
+        const existingStyle = document.getElementById('ycp-dynamic-transforms');
+        if (existingStyle) {
+            existingStyle.remove();
+        }
+        
+        // Create a single style element for all dynamic transforms
+        const style = document.createElement('style');
+        style.id = 'ycp-dynamic-transforms';
+        let styleContent = '';
+        
+        professionalCards.forEach((card, index) => {
+            const description = card.querySelector('.description');
+            const name = card.querySelector('h4');
+            const banner = card.querySelector('.ycp-heute-banner');
+            
+            if (!description || (!name && !banner)) {
+                console.log(`Card ${index}: Skipping - no description or name/banner found`);
+                return;
+            }
+            
+            // Add unique identifier to card
+            const cardId = `ycp-card-${index}`;
+            card.dataset.cardId = cardId;
+            
+            // Create a temporary element to measure the description height
+            const tempDesc = description.cloneNode(true);
+            tempDesc.style.cssText = `
+                position: absolute;
+                visibility: hidden;
+                opacity: 1;
+                transform: translateY(0);
+                z-index: -1;
+                width: ${description.offsetWidth}px;
+                padding: ${getComputedStyle(description).padding};
+                font-size: ${getComputedStyle(description).fontSize};
+                line-height: ${getComputedStyle(description).lineHeight};
+                font-family: ${getComputedStyle(description).fontFamily};
+            `;
+            
+            // Temporarily add to DOM to measure
+            card.appendChild(tempDesc);
+            const descriptionHeight = tempDesc.offsetHeight;
+            card.removeChild(tempDesc);
+            
+            // Calculate the transform value with reduced spacing
+            // We want to move the name/banner up by the description height plus minimal padding
+            const baseOffset = 0; // Reduced from 30px to 10px for tighter spacing
+            const transformValue = -(descriptionHeight + baseOffset);
+            
+            console.log(`Card ${index}: Description height: ${descriptionHeight}px, Transform: ${transformValue}px`);
+            
+            // Add CSS rules for this specific card
+            styleContent += `
+                .ycp-pro[data-card-id="${cardId}"]:hover h4,
+                .ycp-pro[data-card-id="${cardId}"]:focus-within h4 {
+                    transform: translateY(${transformValue}px) !important;
+                }
+                .ycp-pro[data-card-id="${cardId}"]:hover .ycp-heute-banner,
+                .ycp-pro[data-card-id="${cardId}"]:focus-within .ycp-heute-banner {
+                    transform: translateY(${transformValue}px) !important;
+                }
+            `;
+        });
+        
+        // Add the style to the document
+        if (styleContent) {
+            style.textContent = styleContent;
+            document.head.appendChild(style);
+            console.log('Dynamic transform styles applied successfully');
+        } else {
+            console.log('No dynamic transform styles to apply');
+        }
+    }
+
+    if (showAllBtn) {
+        showAllBtn.addEventListener('click', function() {
+            fetchAllProfessionals();
+            if (calendar && typeof calendar.clear === 'function') {
+                // Clear the selected date completely
+                console.log('Before clearing - selected dates:', calendar.selectedDates);
+                calendar.clear();
+                calendar.setDate(null);
+                console.log('After clearing - selected dates:', calendar.selectedDates);
+                
+                // Also remove any visual selection styling from the calendar container
+                setTimeout(() => {
+                    // Target elements specifically within ycp-calendar-container
+                    const calendarContainer = document.getElementById('ycp-calendar-container');
+                    if (calendarContainer) {
+                        // Remove selected class from all days in the container
+                        const selectedDays = calendarContainer.querySelectorAll('.flatpickr-day.selected');
+                        selectedDays.forEach(day => {
+                            day.classList.remove('selected');
+                        });
+                        
+                        const todaySelected = calendarContainer.querySelectorAll('.flatpickr-day.today.selected');
+                        todaySelected.forEach(day => {
+                            day.classList.remove('selected');
+                        });
+                        
+                        // Also target any selected days globally as backup
+                        const allSelectedDays = document.querySelectorAll('.flatpickr-day.selected');
+                        allSelectedDays.forEach(day => {
+                            day.classList.remove('selected');
+                        });
+                        
+                        console.log('Date selection cleared from ycp-calendar-container');
+                        
+                        // Debug: Log all remaining classes on calendar days
+                        const allDays = calendarContainer.querySelectorAll('.flatpickr-day');
+                        console.log('All calendar days after clearing:', allDays.length);
+                        allDays.forEach((day, index) => {
+                            if (day.classList.contains('selected') || day.classList.contains('today')) {
+                                console.log(`Day ${index}: classes = ${day.className}, text = "${day.textContent}"`);
+                            }
+                        });
+                    } else {
+                        console.log('ycp-calendar-container not found, clearing globally');
+                        // Fallback to global clearing
+                        const selectedDays = document.querySelectorAll('.flatpickr-day.selected');
+                        selectedDays.forEach(day => {
+                            day.classList.remove('selected');
+                        });
+                    }
+                }, 100);
+            } else {
+                console.log('Calendar object not available, clearing selection manually');
+                // Fallback: Clear selection manually without calendar object
+                setTimeout(() => {
+                    const allSelectedDays = document.querySelectorAll('.flatpickr-day.selected');
+                    allSelectedDays.forEach(day => {
+                        day.classList.remove('selected');
+                    });
+                    console.log('Manual date selection clearing completed');
+                }, 100);
+            }
+            // Header text will be changed in fetchAllProfessionals after content loads
+        });
+    }
     
     if (datePicker && resultsContainer) {
         // Get today's date in YYYY-MM-DD format for default selection
@@ -83,6 +285,32 @@ document.addEventListener('DOMContentLoaded', function () {
                 })
                 .then(html => {
                     resultsContainer.innerHTML = html;
+                    
+                    // Check if professionals are available for the selected date
+                    const availabilityData = resultsContainer.querySelector('.ycp-availability-data');
+                    const headerTitle = document.querySelector('.ycp-calendar-header h3');
+                    
+                    if (availabilityData && headerTitle) {
+                        const isAvailable = availabilityData.getAttribute('data-available') === 'true';
+                        const selectedDate = availabilityData.getAttribute('data-selected-date');
+                        const today = new Date().toISOString().split('T')[0];
+                        
+                        if (!isAvailable && selectedDate === date) {
+                            // No professionals available for the selected date
+                            headerTitle.textContent = 'Für den ausgewählten Tag ist niemand verfügbar';
+                        } else if (date === today) {
+                            // Today's date selected and professionals are available
+                            headerTitle.textContent = 'Heute anwesend';
+                        } else {
+                            // Other date selected and professionals are available
+                            headerTitle.textContent = 'Verfügbare Ladies';
+                        }
+                    }
+                    
+                    // Apply dynamic transforms after content is loaded
+                    setTimeout(() => {
+                        applyDynamicTransforms();
+                    }, 100);
                 })
                 .catch(error => {
                     console.error('Error fetching professionals:', error);
@@ -109,7 +337,7 @@ document.addEventListener('DOMContentLoaded', function () {
             defaultDate: todayFormatted, // Set default date to today
             prevArrow: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
             nextArrow: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>',
-            locale: "de", // Use German locale
+            // locale: "de", // German locale disabled due to loading issues
             onChange: function (selectedDates, dateStr) {
                 // Send AJAX request when a date is selected
                 fetchProfessionals(dateStr);
@@ -129,7 +357,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 setTimeout(() => fetchProfessionals(todayFormatted), 200);
                 
                 // Call redraw after a slight delay to ensure all styles are applied
-                setTimeout(() => calendar.redraw(), 150);
+                setTimeout(() => {
+                    if (calendar && typeof calendar.redraw === 'function') {
+                        calendar.redraw();
+                    }
+                }, 150);
             },
             onMonthChange: function() {
                 // Re-apply fixes when month changes
@@ -137,23 +369,33 @@ document.addEventListener('DOMContentLoaded', function () {
             },
             onOpen: function() {
                 fixCalendarAppearance();
-                calendar.redraw();
+                if (typeof calendar.redraw === 'function') {
+                    calendar.redraw();
+                }
             }
         });
         
         // Function to ensure mobile shows only one month, larger screens show two
         function enforceMobileMonthCount() {
+            if (!calendar || !calendar.config) {
+                console.log('Calendar not ready for mobile month count enforcement');
+                return;
+            }
             const isPhone = window.innerWidth < 480;
             const currentMonthCount = calendar.config.showMonths;
             
             if (isPhone && currentMonthCount > 1) {
                 // Phone view - show only one month
                 calendar.set('showMonths', 1);
-                calendar.redraw();
+                if (typeof calendar.redraw === 'function') {
+                    calendar.redraw();
+                }
             } else if (!isPhone && currentMonthCount === 1) {
                 // Tablet/Desktop view - show two months
                 calendar.set('showMonths', 2);
-                calendar.redraw();
+                if (typeof calendar.redraw === 'function') {
+                    calendar.redraw();
+                }
             }
         }
         
@@ -309,6 +551,11 @@ document.addEventListener('DOMContentLoaded', function () {
             
             // Re-apply appearance fixes
             fixCalendarAppearance();
+            
+            // Recalculate dynamic transforms for professional cards
+            setTimeout(() => {
+                applyDynamicTransforms();
+            }, 200);
         });
 
         // Force reflow to apply styles - use the proper selector instead of undefined calendarContainer
@@ -324,6 +571,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 fixCalendarAppearance();
                 calendar.redraw();
             }
+            
+            // Apply dynamic transforms after page load
+            setTimeout(() => {
+                applyDynamicTransforms();
+            }, 300);
         });
     }
 });

@@ -20,6 +20,12 @@ if (!defined('ABSPATH')) {
 // Include admin files
 require_once plugin_dir_path(__FILE__) . 'admin/color-settings.php';
 
+// Include data handler
+require_once plugin_dir_path(__FILE__) . 'includes/data-handler.php';
+
+// Include overview UI
+require_once plugin_dir_path(__FILE__) . 'includes/overview-ui.php';
+
 add_action('init', 'ycp_register_professional_cpt');
 
 function ycp_register_professional_cpt() {
@@ -52,6 +58,7 @@ function ycp_add_professional_meta_box() {
 function ycp_render_professional_meta_box($post) {
     $profile_url = get_post_meta($post->ID, '_ycp_profile_url', true);
     $available_dates = get_post_meta($post->ID, '_ycp_available_dates', true);
+    $description = get_post_meta($post->ID, '_ycp_description', true);
 
     echo '<label for="ycp_profile_url">Profile Page URL:</label><br>';
     echo '<input type="url" name="ycp_profile_url" value="' . esc_attr($profile_url) . '" style="width: 100%;" /><br><br>';
@@ -59,6 +66,9 @@ function ycp_render_professional_meta_box($post) {
     echo '<label for="ycp_available_dates"><strong>Available Dates:</strong></label><br>';
     echo '<input type="text" id="ycp_available_dates" name="ycp_available_dates" value="' . esc_attr($available_dates) . '" style="width: 100%;" placeholder="Select dates..." /><br>';
     echo '<small>Hold CTRL (or CMD) to select multiple dates.</small><br><br>';
+
+    echo '<label for="ycp_description"><strong>Description:</strong></label><br>';
+    echo '<textarea id="ycp_description" name="ycp_description" rows="3" style="width: 100%;">' . esc_textarea($description) . '</textarea><br><br>';
 
     wp_nonce_field('ycp_save_professional_meta', 'ycp_professional_nonce');
 }
@@ -83,6 +93,11 @@ function ycp_save_professional_meta($post_id) {
     if (isset($_POST['ycp_available_dates'])) {
         $raw_dates = sanitize_text_field($_POST['ycp_available_dates']);
         update_post_meta($post_id, '_ycp_available_dates', $raw_dates);
+    }
+
+    // Save description
+    if (isset($_POST['ycp_description'])) {
+        update_post_meta($post_id, '_ycp_description', sanitize_textarea_field($_POST['ycp_description']));
     }
 }
 
@@ -127,17 +142,169 @@ function ycp_render_calendar_shortcode() {
     return ob_get_clean();
 }
 
+// Register shortcode for simple integration (today's availability only)
+add_shortcode('ycp_today_simple', 'ycp_render_today_simple_shortcode');
+
+function ycp_render_today_simple_shortcode($atts) {
+    // Get color settings options
+    $options = get_option('ycp_color_options', []);
+    
+    // Add custom class if we have color settings
+    $container_class = '';
+    if (!empty($options)) {
+        if (isset($options['ycp_use_theme_colors']) && $options['ycp_use_theme_colors']) {
+            $container_class = 'class="ycp-theme-color-sync"';
+        } else {
+            $container_class = 'class="ycp-custom-colors"';
+        }
+    }
+    
+    ob_start();
+    
+    // Use the same container structure as the full integration but without calendar
+    echo '<div id="ycp-simple-results" ' . $container_class . '>';
+    
+    // Get today's date
+    $today = date('Y-m-d');
+    
+    // Get professionals available today
+    $args = [
+        'post_type' => 'ycp_professional',
+        'posts_per_page' => -1
+    ];
+
+    $query = new WP_Query($args);
+
+    echo '<div class="ycp-pro-list">';
+    
+    $found_professionals = false;
+    
+    if ($query->have_posts()) {
+        while ($query->have_posts()) {
+            $query->the_post();
+            $dates = get_post_meta(get_the_ID(), '_ycp_available_dates', true);
+            $date_array = array_map('trim', explode(',', $dates));
+
+            // Check if professional is available today
+            if (in_array($today, $date_array)) {
+                $found_professionals = true;
+                $name = get_the_title();
+                $img = get_the_post_thumbnail(get_the_ID(), 'medium');
+                $url = get_post_meta(get_the_ID(), '_ycp_profile_url', true);
+
+                echo '<div class="ycp-pro">';
+                
+                // Check if URL exists and is not empty
+                if (!empty($url)) {
+                    $url = esc_url($url);
+                    echo "<a href='{$url}'><div class='image-container'>{$img}<h4>{$name}</h4></div></a>";
+                } else {
+                    echo "<div class='image-container'>{$img}<h4>{$name}</h4></div>";
+                }
+                
+                echo '</div>';
+            }
+        }
+    }
+    
+    wp_reset_postdata();
+    
+    if (!$found_professionals) {
+        echo '<p>No professionals available today.</p>';
+    }
+    
+    echo '</div>';
+    echo '</div>';
+    
+    return ob_get_clean();
+}
+
+// Register shortcode for compact availability data display
+add_shortcode('ycp_availability_data', 'ycp_render_availability_data_shortcode');
+
+function ycp_render_availability_data_shortcode($atts) {
+    $atts = shortcode_atts([
+        'professional_id' => 0,
+        'date_from' => '',
+        'date_to' => '',
+        'show_title' => 'true',
+        'show_count' => 'false',
+        'separator' => '<br>',
+        'no_dates_text' => 'No availability dates found.',
+        'css_class' => 'ycp-availability-compact'
+    ], $atts, 'ycp_availability_data');
+    
+    if (empty($atts['professional_id'])) {
+        return '<p class="ycp-error">Professional ID is required.</p>';
+    }
+    
+    try {
+        $data_handler = new YCP_Data_Handler();
+        $data = $data_handler->get_professional_availability_compact(
+            (int) $atts['professional_id'],
+            $atts['date_from'],
+            $atts['date_to'],
+            true
+        );
+        
+        if (empty($data['available_dates_formatted'])) {
+            return '<p class="' . esc_attr($atts['css_class']) . '">' . esc_html($atts['no_dates_text']) . '</p>';
+        }
+        
+        $output = '<div class="' . esc_attr($atts['css_class']) . '">';
+        
+        // Show professional title if requested
+        if ($atts['show_title'] === 'true' && !empty($data['professional_name'])) {
+            $output .= '<h4 class="ycp-professional-title">' . esc_html($data['professional_name']) . '</h4>';
+        }
+        
+        // Show date ranges
+        $output .= '<div class="ycp-date-ranges">';
+        $output .= implode($atts['separator'], array_map('esc_html', $data['available_dates_formatted']));
+        $output .= '</div>';
+        
+        // Show count if requested
+        if ($atts['show_count'] === 'true') {
+            $total_dates = count($data['available_dates']);
+            $total_ranges = count($data['available_dates_formatted']);
+            $output .= '<div class="ycp-date-count">';
+            $output .= sprintf(
+                '<small>%d dates in %d range%s</small>',
+                $total_dates,
+                $total_ranges,
+                $total_ranges !== 1 ? 's' : ''
+            );
+            $output .= '</div>';
+        }
+        
+        $output .= '</div>';
+        
+        return $output;
+        
+    } catch (Exception $e) {
+        return '<p class="ycp-error">Error loading availability data: ' . esc_html($e->getMessage()) . '</p>';
+    }
+}
 
 add_action('wp_enqueue_scripts', 'ycp_enqueue_frontend_assets');
 function ycp_enqueue_frontend_assets() {
-    wp_enqueue_script('flatpickr', 'https://cdn.jsdelivr.net/npm/flatpickr', [], null, true);
     wp_enqueue_style('flatpickr-style', 'https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css');
-    
     wp_enqueue_style('ycp-style', plugin_dir_url(__FILE__) . 'public/assets/style.css');
+    
+    wp_enqueue_script('flatpickr', 'https://cdn.jsdelivr.net/npm/flatpickr', [], null, true);
     wp_enqueue_script('ycp-script', plugin_dir_url(__FILE__) . 'public/assets/script.js', ['jquery', 'flatpickr'], null, true);
+    wp_enqueue_script('ycp-availability-api', plugin_dir_url(__FILE__) . 'public/assets/availability-api.js', ['jquery'], null, true);
 
     wp_localize_script('ycp-script', 'ycp_ajax', [
-        'ajax_url' => admin_url('admin-ajax.php')
+        'ajax_url' => admin_url('admin-ajax.php'),
+        'rest_url' => rest_url(),
+        'nonce' => wp_create_nonce('ycp_availability_data_nonce')
+    ]);
+    
+    wp_localize_script('ycp-availability-api', 'ycp_ajax', [
+        'ajax_url' => admin_url('admin-ajax.php'),
+        'rest_url' => rest_url(),
+        'nonce' => wp_create_nonce('ycp_availability_data_nonce')
     ]);
 }
 
@@ -183,8 +350,91 @@ add_action('wp_head', 'ycp_output_custom_css');
 add_action('wp_ajax_ycp_get_professionals', 'ycp_get_professionals_by_date');
 add_action('wp_ajax_nopriv_ycp_get_professionals', 'ycp_get_professionals_by_date');
 
+add_action('wp_ajax_ycp_get_all_professionals', 'ycp_get_all_professionals');
+add_action('wp_ajax_nopriv_ycp_get_all_professionals', 'ycp_get_all_professionals');
+
 function ycp_get_professionals_by_date() {
     $date = sanitize_text_field($_GET['date']);
+    $today = date('Y-m-d');
+
+    $args = [
+        'post_type' => 'ycp_professional',
+        'posts_per_page' => -1
+    ];
+
+    $query = new WP_Query($args);
+
+    $output = '<div class="ycp-pro-list">';
+    $found_professionals = false;
+    
+    if ($query->have_posts()) {
+        while ($query->have_posts()) {
+            $query->the_post();
+            $dates = get_post_meta(get_the_ID(), '_ycp_available_dates', true);
+            $date_array = array_map('trim', explode(',', $dates));
+
+            if (in_array($date, $date_array)) {
+                $found_professionals = true;
+                $name = get_the_title();
+                $img = get_the_post_thumbnail(get_the_ID(), 'medium');
+                $url = get_post_meta(get_the_ID(), '_ycp_profile_url', true);
+                $description = get_post_meta(get_the_ID(), '_ycp_description', true);
+                
+                // Check if this person is also available today (regardless of selected date)
+                $is_available_today = in_array($today, $date_array);
+
+                $output .= '<div class="ycp-pro">';
+                
+                // Check if URL exists and is not empty
+                if (!empty($url)) {
+                    $url = esc_url($url);
+                    $output .= "<a href='{$url}'>";
+                }
+                
+                $output .= "<div class='image-container'>";
+                $output .= $img;
+                $output .= "<div class='text-overlay-bg'></div>";
+                $output .= "<div class='text-overlay'>";
+                $output .= "<h4>{$name}</h4>";
+                
+                // Add "Heute anwesend" banner if person is available today
+                if ($is_available_today) {
+                    $output .= "<div class='ycp-heute-banner'>Heute anwesend</div>";
+                }
+                
+                // Add description if it exists
+                if (!empty($description)) {
+                    $output .= "<p class='description'>" . esc_html($description) . "</p>";
+                }
+                
+                $output .= "</div>"; // Close text-overlay
+                $output .= "</div>"; // Close image-container
+                
+                if (!empty($url)) {
+                    $output .= "</a>";
+                }
+                
+                $output .= '</div>'; // Close ycp-pro
+            }
+        }
+    }
+    
+    if (!$found_professionals) {
+        // No message displayed - just empty results area
+    }
+    
+    $output .= '</div>';
+    
+    // Add data attributes to indicate availability status and selected date
+    $output .= '<div class="ycp-availability-data" data-available="' . ($found_professionals ? 'true' : 'false') . '" data-selected-date="' . esc_attr($date) . '"></div>';
+
+    wp_reset_postdata();
+    echo $output;
+    wp_die();
+}
+
+function ycp_get_all_professionals() {
+    $today = date('Y-m-d');
 
     $args = [
         'post_type' => 'ycp_professional',
@@ -200,27 +450,49 @@ function ycp_get_professionals_by_date() {
             $dates = get_post_meta(get_the_ID(), '_ycp_available_dates', true);
             $date_array = array_map('trim', explode(',', $dates));
 
-            if (in_array($date, $date_array)) {
-                $name = get_the_title();
-                $img = get_the_post_thumbnail(get_the_ID(), 'medium');
-                $url = get_post_meta(get_the_ID(), '_ycp_profile_url', true);
+            $name = get_the_title();
+            $img = get_the_post_thumbnail(get_the_ID(), 'medium');
+            $url = get_post_meta(get_the_ID(), '_ycp_profile_url', true);
+            $description = get_post_meta(get_the_ID(), '_ycp_description', true);
+            
+            // Check if this person is available today
+            $is_available_today = in_array($today, $date_array);
 
-                $output .= '<div class="ycp-pro">';
-                
-                // Check if URL exists and is not empty
-                if (!empty($url)) {
-                    $url = esc_url($url);
-                    $output .= "<a href='{$url}'><div class='image-container'>{$img}<h4>{$name}</h4></div></a>";
-                } else {
-                    // No URL, render as non-clickable
-                    $output .= "<div class='image-container non-clickable'>{$img}<h4>{$name}</h4></div>";
-                }
-                
-                $output .= '</div>';
+            $output .= '<div class="ycp-pro">';
+            
+            // Check if URL exists and is not empty
+            if (!empty($url)) {
+                $url = esc_url($url);
+                $output .= "<a href='{$url}'>";
             }
+            
+            $output .= "<div class='image-container'>";
+            $output .= $img;
+            $output .= "<div class='text-overlay-bg'></div>";
+            $output .= "<div class='text-overlay'>";
+            $output .= "<h4>{$name}</h4>";
+            
+            // Add "Heute anwesend" banner if person is available today
+            if ($is_available_today) {
+                $output .= "<div class='ycp-heute-banner'>Heute anwesend</div>";
+            }
+            
+            // Add description if it exists
+            if (!empty($description)) {
+                $output .= "<p class='description'>" . esc_html($description) . "</p>";
+            }
+            
+            $output .= "</div>"; // Close text-overlay
+            $output .= "</div>"; // Close image-container
+            
+            if (!empty($url)) {
+                $output .= "</a>";
+            }
+            
+            $output .= '</div>'; // Close ycp-pro
         }
     } else {
-        $output .= '<p>Keine Fachleute gefunden.</p>';
+        // No message displayed - just empty results area
     }
     $output .= '</div>';
 

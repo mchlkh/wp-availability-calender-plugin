@@ -231,6 +231,30 @@ document.addEventListener('DOMContentLoaded', function () {
                               String(today.getMonth() + 1).padStart(2, '0') + '-' + 
                               String(today.getDate()).padStart(2, '0');
         
+        // Parse existing dates from the input field
+        const currentValue = dateInput.value.trim();
+        let existingDates = [];
+        let defaultDate = todayFormatted;
+        
+        if (currentValue) {
+            // Split the comma-separated dates and clean them up
+            existingDates = currentValue.split(',').map(date => date.trim()).filter(date => {
+                // Validate that the date is in YYYY-MM-DD format
+                const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+                return date && dateRegex.test(date);
+            });
+            
+            if (existingDates.length > 0) {
+                // Use the first existing date as default, or today if no valid dates
+                defaultDate = existingDates[0];
+                console.log('Found existing dates:', existingDates);
+            } else {
+                console.log('No valid dates found in input, using today as default');
+            }
+        } else {
+            console.log('No existing dates found, using today as default');
+        }
+        
         // Initialize flatpickr
         const adminCalendar = flatpickr(dateInput, {
             mode: 'multiple',
@@ -239,16 +263,26 @@ document.addEventListener('DOMContentLoaded', function () {
             static: true,
             monthSelectorType: 'static',
             locale: "de",
-            defaultDate: todayFormatted, // Default to today
+            defaultDate: existingDates.length > 0 ? existingDates : todayFormatted, // Use existing dates or today
             prevArrow: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
             nextArrow: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>',
             onReady: function() {
                 // Fix calendar appearance after initialization
                 fixCalendarAppearance(adminCalendar);
                 
-                // If the field is empty, select today's date
-                const currentValue = dateInput.value.trim();
-                if (!currentValue) {
+                // If there are existing dates, make sure they are properly set in the calendar
+                if (existingDates.length > 0) {
+                    console.log('Setting existing dates in calendar:', existingDates);
+                    // Set the existing dates in the calendar
+                    adminCalendar.setDate(existingDates);
+                    
+                    // Jump to the first date to show it in view
+                    const firstDate = new Date(existingDates[0]);
+                    adminCalendar.jumpToDate(firstDate);
+                    console.log('Jumped to first date:', existingDates[0]);
+                } else {
+                    console.log('No existing dates, setting today as default');
+                    // If no existing dates, set today as default
                     adminCalendar.setDate(today);
                     // Update the input value with today's date
                     dateInput.value = todayFormatted;
