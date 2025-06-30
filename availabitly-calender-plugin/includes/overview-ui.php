@@ -23,10 +23,37 @@ if (!defined('ABSPATH')) {
 class YCP_Overview_UI {
     
     /**
+     * Plugin text domain
+     */
+    const TEXT_DOMAIN = 'availability-calendar-plugin';
+    
+    /**
+     * Nonce action for AJAX requests
+     */
+    const NONCE_ACTION = 'ycp_overview_nonce';
+    
+    /**
+     * Data handler instance
+     */
+    private $data_handler;
+    
+    /**
      * Initialize the overview UI
      */
     public function __construct() {
+        $this->init_data_handler();
         $this->init_hooks();
+    }
+    
+    /**
+     * Initialize data handler
+     */
+    private function init_data_handler(): void {
+        global $ycp_data_handler;
+        if (!$ycp_data_handler) {
+            $ycp_data_handler = new YCP_Data_Handler();
+        }
+        $this->data_handler = $ycp_data_handler;
     }
     
     /**
@@ -46,14 +73,40 @@ class YCP_Overview_UI {
         // Add AJAX handlers
         add_action('wp_ajax_ycp_get_overview_data', [$this, 'handle_get_overview_data']);
         add_action('wp_ajax_nopriv_ycp_get_overview_data', [$this, 'handle_get_overview_data']);
+        
+        // Register admin dashboard widget
+        add_action('wp_dashboard_setup', [$this, 'register_admin_widget']);
+    }
+    
+    /**
+     * Register admin dashboard widget
+     */
+    public function register_admin_widget(): void {
+        wp_add_dashboard_widget(
+            'ycp_availability_overview_widget',
+            __('Availability Overview', self::TEXT_DOMAIN),
+            [$this, 'render_admin_overview_widget']
+        );
     }
     
     /**
      * Enqueue overview assets
      */
     public function enqueue_overview_assets(): void {
-        wp_enqueue_style('ycp-overview-style', plugin_dir_url(dirname(__FILE__)) . 'public/assets/availability-overview.css', [], '1.0.0');
-        wp_enqueue_script('ycp-overview-script', plugin_dir_url(dirname(__FILE__)) . 'public/assets/availability-overview.js', ['jquery'], '1.0.0', true);
+        wp_enqueue_style(
+            'ycp-overview-style', 
+            plugin_dir_url(dirname(__FILE__)) . 'public/assets/availability-overview.css', 
+            [], 
+            '1.0.0'
+        );
+        
+        wp_enqueue_script(
+            'ycp-overview-script', 
+            plugin_dir_url(dirname(__FILE__)) . 'public/assets/availability-overview.js', 
+            ['jquery'], 
+            '1.0.0', 
+            true
+        );
         
         // Add Chart.js for chart view
         wp_enqueue_script('chart-js', 'https://cdn.jsdelivr.net/npm/chart.js', [], null, true);
@@ -61,7 +114,7 @@ class YCP_Overview_UI {
         // Localize script
         wp_localize_script('ycp-overview-script', 'ycp_overview', [
             'ajax_url' => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('ycp_overview_nonce')
+            'nonce' => wp_create_nonce(self::NONCE_ACTION)
         ]);
     }
     
@@ -70,17 +123,12 @@ class YCP_Overview_UI {
      */
     public function handle_get_overview_data(): void {
         // Verify nonce
-        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'ycp_overview_nonce')) {
-            wp_send_json_error(['message' => 'Security check failed'], 403);
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], self::NONCE_ACTION)) {
+            wp_send_json_error(['message' => __('Security check failed', self::TEXT_DOMAIN)], 403);
         }
         
         try {
-            global $ycp_data_handler;
-            if (!$ycp_data_handler) {
-                $ycp_data_handler = new YCP_Data_Handler();
-            }
-            
-            $data = $ycp_data_handler->get_all_professionals_availability(100);
+            $data = $this->data_handler->get_all_professionals_availability(100);
             wp_send_json_success($data);
         } catch (Exception $e) {
             wp_send_json_error(['message' => $e->getMessage()], 500);
@@ -109,6 +157,20 @@ class YCP_Overview_UI {
             $container_class .= ' ' . esc_attr($atts['class']);
         }
         
+        $data_attrs = $this->build_data_attributes($atts);
+        
+        return sprintf(
+            '<div id="%s" class="%s"%s></div>',
+            esc_attr($container_id),
+            esc_attr($container_class),
+            $data_attrs
+        );
+    }
+    
+    /**
+     * Build data attributes string for shortcode
+     */
+    private function build_data_attributes(array $atts): string {
         $data_attrs = [
             'data-ycp-overview' => 'true',
             'data-ycp-view' => esc_attr($atts['view']),
@@ -125,7 +187,7 @@ class YCP_Overview_UI {
             $data_attr_string .= ' ' . $key . '="' . $value . '"';
         }
         
-        return '<div id="' . esc_attr($container_id) . '" class="' . $container_class . '"' . $data_attr_string . '></div>';
+        return $data_attr_string;
     }
     
     /**
@@ -165,61 +227,69 @@ class YCP_Overview_UI {
      */
     public function render_admin_overview_widget(): void {
         try {
-            global $ycp_data_handler;
-            if (!$ycp_data_handler) {
-                $ycp_data_handler = new YCP_Data_Handler();
+            $overview_data = $this->get_overview_data(['limit' => 50]);
+            
+            if (empty($overview_data)) {
+                echo '<p class="error">' . __('Unable to load overview data.', self::TEXT_DOMAIN) . '</p>';
+                return;
             }
             
-            $all_data = $ycp_data_handler->get_all_professionals_availability(50);
-            $today_data = $ycp_data_handler->get_availability_by_date();
-            
-            echo '<div class="ycp-admin-overview-widget">';
-            echo '<h3>Availability Overview</h3>';
-            
-            // Summary cards
-            echo '<div class="overview-summary-cards">';
-            echo '<div class="summary-card">';
-            echo '<div class="card-number">' . esc_html($all_data['count']) . '</div>';
-            echo '<div class="card-label">Total Professionals</div>';
-            echo '</div>';
-            
-            echo '<div class="summary-card">';
-            echo '<div class="card-number">' . esc_html($today_data['count']) . '</div>';
-            echo '<div class="card-label">Available Today</div>';
-            echo '</div>';
-            
-            $total_days = 0;
-            foreach ($all_data['professionals'] as $professional) {
-                $total_days += $professional['total_available_days'];
-            }
-            $avg_days = $all_data['count'] > 0 ? round($total_days / $all_data['count']) : 0;
-            
-            echo '<div class="summary-card">';
-            echo '<div class="card-number">' . esc_html($avg_days) . '</div>';
-            echo '<div class="card-label">Avg. Days Available</div>';
-            echo '</div>';
-            echo '</div>';
-            
-            // Top professionals
-            if (!empty($all_data['professionals'])) {
-                echo '<h4>Most Available Professionals</h4>';
-                echo '<ul class="top-professionals-list">';
-                $top_professionals = array_slice($all_data['professionals'], 0, 5);
-                foreach ($top_professionals as $professional) {
-                    echo '<li>';
-                    echo '<span class="professional-name">' . esc_html($professional['name']) . '</span>';
-                    echo '<span class="available-days">' . esc_html($professional['total_available_days']) . ' days</span>';
-                    echo '</li>';
-                }
-                echo '</ul>';
-            }
-            
-            echo '</div>';
+            $this->render_admin_widget_content($overview_data);
             
         } catch (Exception $e) {
-            echo '<p class="error">Unable to load overview data.</p>';
+            echo '<p class="error">' . __('Unable to load overview data.', self::TEXT_DOMAIN) . '</p>';
             error_log('Admin overview error: ' . $e->getMessage());
         }
+    }
+    
+    /**
+     * Render admin widget content
+     */
+    private function render_admin_widget_content(array $data): void {
+        echo '<div class="ycp-admin-overview-widget">';
+        echo '<h3>' . __('Availability Overview', self::TEXT_DOMAIN) . '</h3>';
+        
+        // Summary cards
+        echo '<div class="overview-summary-cards">';
+        $this->render_summary_card($data['total_professionals'], __('Total Professionals', self::TEXT_DOMAIN));
+        $this->render_summary_card($data['available_today'], __('Available Today', self::TEXT_DOMAIN));
+        $this->render_summary_card($data['average_days_per_professional'], __('Avg. Days Available', self::TEXT_DOMAIN));
+        echo '</div>';
+        
+        // Top professionals
+        if (!empty($data['professionals'])) {
+            $this->render_top_professionals($data['professionals']);
+        }
+        
+        echo '</div>';
+    }
+    
+    /**
+     * Render a summary card
+     */
+    private function render_summary_card(int $number, string $label): void {
+        echo '<div class="summary-card">';
+        echo '<div class="card-number">' . esc_html($number) . '</div>';
+        echo '<div class="card-label">' . esc_html($label) . '</div>';
+        echo '</div>';
+    }
+    
+    /**
+     * Render top professionals list
+     */
+    private function render_top_professionals(array $professionals): void {
+        echo '<h4>' . __('Most Available Professionals', self::TEXT_DOMAIN) . '</h4>';
+        echo '<ul class="top-professionals-list">';
+        
+        $top_professionals = array_slice($professionals, 0, 5);
+        foreach ($top_professionals as $professional) {
+            echo '<li>';
+            echo '<span class="professional-name">' . esc_html($professional['name']) . '</span>';
+            echo '<span class="available-days">' . esc_html($professional['total_available_days']) . ' ' . __('days', self::TEXT_DOMAIN) . '</span>';
+            echo '</li>';
+        }
+        
+        echo '</ul>';
     }
     
     /**
@@ -236,41 +306,35 @@ class YCP_Overview_UI {
         $options = wp_parse_args($options, $defaults);
         
         try {
-            global $ycp_data_handler;
-            if (!$ycp_data_handler) {
-                $ycp_data_handler = new YCP_Data_Handler();
-            }
-            
-            ob_start();
-            
             if ($options['show_today_only']) {
-                $data = $ycp_data_handler->get_availability_by_date('', $options['limit']);
-                $this->render_today_overview($data, $options['template']);
+                $data = $this->data_handler->get_availability_by_date('', $options['limit']);
+                return $this->render_today_overview_html($data, $options['template']);
             } else {
-                $data = $ycp_data_handler->get_all_professionals_availability($options['limit']);
-                $this->render_full_overview($data, $options['view'], $options['template']);
+                $data = $this->data_handler->get_all_professionals_availability($options['limit']);
+                return $this->render_full_overview_html($data, $options['view'], $options['template']);
             }
-            
-            return ob_get_clean();
             
         } catch (Exception $e) {
             error_log('Theme overview error: ' . $e->getMessage());
-            return '<p class="ycp-error">Unable to load availability overview.</p>';
+            return '<p class="ycp-error">' . __('Unable to load availability overview.', self::TEXT_DOMAIN) . '</p>';
         }
     }
     
     /**
-     * Render today's overview
+     * Render today's overview HTML
      */
-    private function render_today_overview(array $data, string $template): void {
+    private function render_today_overview_html(array $data, string $template): string {
+        ob_start();
+        
         if ($template === 'minimal') {
             echo '<div class="ycp-today-minimal">';
             echo '<span class="count">' . esc_html($data['count']) . '</span>';
-            echo '<span class="label">available today</span>';
+            echo '<span class="label">' . __('available today', self::TEXT_DOMAIN) . '</span>';
             echo '</div>';
         } else {
             echo '<div class="ycp-today-overview">';
-            echo '<h3>Available Today (' . esc_html($data['count']) . ')</h3>';
+            echo '<h3>' . sprintf(__('Available Today (%d)', self::TEXT_DOMAIN), $data['count']) . '</h3>';
+            
             if ($data['count'] > 0) {
                 echo '<ul class="today-professionals">';
                 foreach ($data['available_professionals'] as $professional) {
@@ -278,35 +342,41 @@ class YCP_Overview_UI {
                 }
                 echo '</ul>';
             } else {
-                echo '<p>No professionals available today.</p>';
+                echo '<p>' . __('No professionals available today.', self::TEXT_DOMAIN) . '</p>';
             }
             echo '</div>';
         }
+        
+        return ob_get_clean();
     }
     
     /**
-     * Render full overview
+     * Render full overview HTML
      */
-    private function render_full_overview(array $data, string $view, string $template): void {
+    private function render_full_overview_html(array $data, string $view, string $template): string {
+        ob_start();
+        
         switch ($view) {
             case 'summary':
-                $this->render_summary_view($data, $template);
+                $this->render_summary_view_html($data, $template);
                 break;
             case 'list':
-                $this->render_list_view($data, $template);
+                $this->render_list_view_html($data, $template);
                 break;
             case 'grid':
-                $this->render_grid_view($data, $template);
+                $this->render_grid_view_html($data, $template);
                 break;
             default:
-                $this->render_summary_view($data, $template);
+                $this->render_summary_view_html($data, $template);
         }
+        
+        return ob_get_clean();
     }
     
     /**
-     * Render summary view
+     * Render summary view HTML
      */
-    private function render_summary_view(array $data, string $template): void {
+    private function render_summary_view_html(array $data, string $template): void {
         $total_professionals = $data['count'];
         $available_today = 0;
         $total_days = 0;
@@ -322,60 +392,65 @@ class YCP_Overview_UI {
         
         echo '<div class="ycp-summary-view">';
         echo '<div class="summary-stats">';
-        echo '<div class="stat-item">';
-        echo '<div class="stat-number">' . esc_html($total_professionals) . '</div>';
-        echo '<div class="stat-label">Total Professionals</div>';
-        echo '</div>';
-        echo '<div class="stat-item">';
-        echo '<div class="stat-number">' . esc_html($available_today) . '</div>';
-        echo '<div class="stat-label">Available Today</div>';
-        echo '</div>';
-        echo '<div class="stat-item">';
-        echo '<div class="stat-number">' . esc_html($avg_days) . '</div>';
-        echo '<div class="stat-label">Avg. Days Available</div>';
-        echo '</div>';
+        $this->render_stat_item($total_professionals, __('Total Professionals', self::TEXT_DOMAIN));
+        $this->render_stat_item($available_today, __('Available Today', self::TEXT_DOMAIN));
+        $this->render_stat_item($avg_days, __('Avg. Days Available', self::TEXT_DOMAIN));
         echo '</div>';
         echo '</div>';
     }
     
     /**
-     * Render list view
+     * Render a stat item
      */
-    private function render_list_view(array $data, string $template): void {
+    private function render_stat_item(int $number, string $label): void {
+        echo '<div class="stat-item">';
+        echo '<div class="stat-number">' . esc_html($number) . '</div>';
+        echo '<div class="stat-label">' . esc_html($label) . '</div>';
+        echo '</div>';
+    }
+    
+    /**
+     * Render list view HTML
+     */
+    private function render_list_view_html(array $data, string $template): void {
         echo '<div class="ycp-list-view">';
-        echo '<h3>All Professionals</h3>';
+        echo '<h3>' . __('All Professionals', self::TEXT_DOMAIN) . '</h3>';
         echo '<ul class="professionals-list">';
+        
         foreach ($data['professionals'] as $professional) {
             echo '<li class="professional-item">';
             echo '<span class="name">' . esc_html($professional['name']) . '</span>';
-            echo '<span class="days">' . esc_html($professional['total_available_days']) . ' days</span>';
+            echo '<span class="days">' . esc_html($professional['total_available_days']) . ' ' . __('days', self::TEXT_DOMAIN) . '</span>';
             if ($professional['is_available_today']) {
-                echo '<span class="today-badge">Today</span>';
+                echo '<span class="today-badge">' . __('Today', self::TEXT_DOMAIN) . '</span>';
             }
             echo '</li>';
         }
+        
         echo '</ul>';
         echo '</div>';
     }
     
     /**
-     * Render grid view
+     * Render grid view HTML
      */
-    private function render_grid_view(array $data, string $template): void {
+    private function render_grid_view_html(array $data, string $template): void {
         echo '<div class="ycp-grid-view">';
-        echo '<h3>Professional Availability</h3>';
+        echo '<h3>' . __('Professional Availability', self::TEXT_DOMAIN) . '</h3>';
         echo '<div class="professionals-grid">';
+        
         foreach ($data['professionals'] as $professional) {
             echo '<div class="professional-card">';
             echo '<h4>' . esc_html($professional['name']) . '</h4>';
             echo '<div class="availability-info">';
-            echo '<span class="days-count">' . esc_html($professional['total_available_days']) . ' days available</span>';
+            echo '<span class="days-count">' . esc_html($professional['total_available_days']) . ' ' . __('days available', self::TEXT_DOMAIN) . '</span>';
             if ($professional['is_available_today']) {
-                echo '<span class="today-indicator">Available Today</span>';
+                echo '<span class="today-indicator">' . __('Available Today', self::TEXT_DOMAIN) . '</span>';
             }
             echo '</div>';
             echo '</div>';
         }
+        
         echo '</div>';
         echo '</div>';
     }
@@ -385,52 +460,45 @@ class YCP_Overview_UI {
      */
     public function get_overview_data(array $options = []): array {
         try {
-            global $ycp_data_handler;
-            if (!$ycp_data_handler) {
-                $ycp_data_handler = new YCP_Data_Handler();
-            }
+            $all_data = $this->data_handler->get_all_professionals_availability($options['limit'] ?? 100);
+            $today_data = $this->data_handler->get_availability_by_date();
             
-            $all_data = $ycp_data_handler->get_all_professionals_availability($options['limit'] ?? 100);
-            $today_data = $ycp_data_handler->get_availability_by_date();
-            
-            $total_days = 0;
-            $available_today = 0;
-            
-            foreach ($all_data['professionals'] as $professional) {
-                $total_days += $professional['total_available_days'];
-                if ($professional['is_available_today']) {
-                    $available_today++;
-                }
-            }
-            
-            return [
-                'total_professionals' => $all_data['count'],
-                'available_today' => $today_data['count'],
-                'total_available_days' => $total_days,
-                'average_days_per_professional' => $all_data['count'] > 0 ? round($total_days / $all_data['count']) : 0,
-                'professionals' => $all_data['professionals'],
-                'today_professionals' => $today_data['available_professionals']
-            ];
+            return $this->calculate_overview_statistics($all_data, $today_data);
             
         } catch (Exception $e) {
             error_log('Overview data error: ' . $e->getMessage());
             return [];
         }
     }
+    
+    /**
+     * Calculate overview statistics
+     */
+    private function calculate_overview_statistics(array $all_data, array $today_data): array {
+        $total_days = 0;
+        $available_today = 0;
+        
+        foreach ($all_data['professionals'] as $professional) {
+            $total_days += $professional['total_available_days'];
+            if ($professional['is_available_today']) {
+                $available_today++;
+            }
+        }
+        
+        return [
+            'total_professionals' => $all_data['count'],
+            'available_today' => $today_data['count'],
+            'total_available_days' => $total_days,
+            'average_days_per_professional' => $all_data['count'] > 0 ? round($total_days / $all_data['count']) : 0,
+            'professionals' => $all_data['professionals'],
+            'today_professionals' => $today_data['available_professionals']
+        ];
+    }
 }
 
 // Initialize the overview UI
 global $ycp_overview_ui;
 $ycp_overview_ui = new YCP_Overview_UI();
-
-// Register admin dashboard widget
-add_action('wp_dashboard_setup', function() {
-    wp_add_dashboard_widget(
-        'ycp_availability_overview_widget',
-        'Availability Overview',
-        [$ycp_overview_ui, 'render_admin_overview_widget']
-    );
-});
 
 // Register global functions for theme integration
 if (!function_exists('ycp_render_availability_overview')) {
