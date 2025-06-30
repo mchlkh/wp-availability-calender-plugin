@@ -223,9 +223,11 @@ class YCP_Display_Handler {
             $output .= '<h4 class="ycp-professional-title">' . esc_html($data['professional_name']) . '</h4>';
         }
         
-        // Show date ranges
+        // Show date ranges - each in its own div for proper spacing
         $output .= '<div class="ycp-date-ranges">';
-        $output .= implode($atts['separator'], array_map('esc_html', $data['available_dates_formatted']));
+        foreach ($data['available_dates_formatted'] as $date_range) {
+            $output .= '<div class="ycp-date-range-item">' . esc_html($date_range) . '</div>';
+        }
         $output .= '</div>';
         
         // Show count if requested

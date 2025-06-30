@@ -1034,3 +1034,46 @@ html, body {
     font-size: 13px;
 }
 
+/* Availability Date Display Styling */
+.availability-date {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 16px !important;
+    align-items: center !important;
+    text-align: center;
+    color: #ffffff;
+    font-family: 'DM Sans', Arial, sans-serif;
+    background: #143930;
+    font-size: 1.2rem;
+    font-weight: 400;
+}
+
+.availability-date > * {
+    margin-bottom: 16px !important;
+}
+.availability-date > *:last-child {
+    margin-bottom: 0 !important;
+}
+
+.ycp-date-ranges {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.ycp-date-range-item {
+    font-size: 1.2rem;
+    color: #fff;
+    font-family: 'DM Sans', Arial, sans-serif;
+    font-weight: 400;
+}
+
+/* Fallback for browsers that do not support gap in flex */
+.ycp-date-ranges:not([style*="gap"]) .ycp-date-range-item {
+    margin-bottom: 16px;
+}
+.ycp-date-ranges:not([style*="gap"]) .ycp-date-range-item:last-child {
+    margin-bottom: 0;
+}
+
+
