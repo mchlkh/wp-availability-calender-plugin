@@ -314,7 +314,10 @@ document.addEventListener('DOMContentLoaded', function () {
         professionals.forEach(professional => {
             html += `
                 <div class="ycp-professional-item" data-id="${professional.id}">
-                    <h3>${escapeHtml(professional.name)}</h3>
+                    <h3>
+                        ${escapeHtml(professional.name)}
+                        <span class="ycp-professional-id">(ID: ${professional.id})</span>
+                    </h3>
                     ${professional.image_url ? `<img src="${escapeHtml(professional.image_url)}" class="ycp-image-preview" alt="">` : ''}
                     ${professional.description ? `<p>${escapeHtml(professional.description)}</p>` : ''}
                     ${professional.available_dates ? `<p><strong>Available Dates:</strong> ${escapeHtml(professional.available_dates)}</p>` : ''}

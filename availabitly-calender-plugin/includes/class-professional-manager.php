@@ -176,6 +176,13 @@ class YCP_Professional_Manager {
                 <!-- Professionals List -->
                 <div class="ycp-list-section">
                     <h2><?php esc_html_e('Current Professionals', self::TEXT_DOMAIN); ?></h2>
+                    
+                    <div class="ycp-info-box">
+                        <p><strong><?php esc_html_e('How to use Professional IDs:', self::TEXT_DOMAIN); ?></strong></p>
+                        <p><?php esc_html_e('Use the ID numbers shown below in your shortcodes like this:', self::TEXT_DOMAIN); ?></p>
+                        <code>[ycp_availability_data professional_id="11" show_title="false" separator=" | " css_class="ycp-availability-compact modern"]</code>
+                    </div>
+                    
                     <div id="ycp-professionals-list">
                         <?php $this->render_professionals_list(); ?>
                     </div>
@@ -210,6 +217,17 @@ class YCP_Professional_Manager {
             margin: 0 0 10px 0;
         }
         
+        .ycp-professional-id {
+            color: #0073aa;
+            font-weight: normal;
+            font-size: 0.9em;
+            background: #e7f3ff;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-left: 8px;
+            border: 1px solid #b3d9ff;
+        }
+        
         .ycp-professional-actions {
             margin-top: 10px;
         }
@@ -222,6 +240,28 @@ class YCP_Professional_Manager {
             max-width: 100px;
             max-height: 100px;
             margin-top: 10px;
+        }
+        
+        .ycp-info-box {
+            background: #f0f8ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .ycp-info-box p {
+            margin: 0 0 10px 0;
+        }
+        
+        .ycp-info-box code {
+            background: #fff;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            display: block;
+            margin-top: 5px;
         }
         </style>
         <?php
@@ -241,7 +281,10 @@ class YCP_Professional_Manager {
         foreach ($professionals as $professional) {
             ?>
             <div class="ycp-professional-item" data-id="<?php echo esc_attr($professional['id']); ?>">
-                <h3><?php echo esc_html($professional['name']); ?></h3>
+                <h3>
+                    <?php echo esc_html($professional['name']); ?>
+                    <span class="ycp-professional-id">(ID: <?php echo esc_html($professional['id']); ?>)</span>
+                </h3>
                 
                 <?php if (!empty($professional['image_url'])): ?>
                     <img src="<?php echo esc_url($professional['image_url']); ?>" class="ycp-image-preview" alt="">

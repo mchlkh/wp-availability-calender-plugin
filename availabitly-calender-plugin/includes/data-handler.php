@@ -131,21 +131,37 @@ class YCP_Data_Handler {
     /**
      * Get availability data for a specific professional
      * 
-     * @param int $professional_id The professional's post ID
+     * @param int $professional_id The professional's database ID
      * @param string $date_from Optional start date (Y-m-d format)
      * @param string $date_to Optional end date (Y-m-d format)
      * @return array Availability data
      * @throws Exception If professional not found or invalid data
      */
     public function get_professional_availability(int $professional_id, string $date_from = '', string $date_to = ''): array {
-        // Validate professional exists
-        $professional = get_post($professional_id);
-        if (!$professional || $professional->post_type !== self::POST_TYPE) {
-            throw new Exception('Professional not found');
+        global $wpdb;
+        
+        // Get professional from custom database table
+        $table_name = $wpdb->prefix . 'ycp_professionals';
+        $professional = $wpdb->get_row(
+            $wpdb->prepare("SELECT * FROM $table_name WHERE id = %d", $professional_id),
+            ARRAY_A
+        );
+        
+        if (!$professional) {
+            // Get all available IDs for debugging
+            $all_ids = $wpdb->get_col("SELECT id FROM $table_name ORDER BY id ASC");
+            $available_ids_str = !empty($all_ids) ? implode(', ', $all_ids) : 'none';
+            
+            throw new Exception(sprintf(
+                'Professional with ID %d not found. Available IDs: %s. Total professionals: %d',
+                $professional_id,
+                $available_ids_str,
+                count($all_ids)
+            ));
         }
         
-        // Get availability dates
-        $available_dates = get_post_meta($professional_id, self::META_AVAILABLE_DATES, true);
+        // Get availability dates from the database
+        $available_dates = $professional['available_dates'] ?? '';
         $date_array = $this->parse_dates_string($available_dates);
         
         // Filter by date range if provided
@@ -154,7 +170,7 @@ class YCP_Data_Handler {
         }
         
         // Get professional data
-        $professional_data = $this->get_professional_meta_data($professional_id);
+        $professional_data = $this->get_professional_meta_data_from_db($professional);
         
         return array_merge($professional_data, [
             'available_dates' => $date_array,
@@ -171,38 +187,34 @@ class YCP_Data_Handler {
      * @return array Array of available professionals
      */
     public function get_availability_by_date(string $date = '', int $limit = 50): array {
+        global $wpdb;
+        
         $date = !empty($date) ? $date : date('Y-m-d');
         
         if (!$this->validate_date_format($date)) {
             throw new Exception('Invalid date format. Use Y-m-d format.');
         }
         
-        $args = [
-            'post_type' => self::POST_TYPE,
-            'posts_per_page' => $limit,
-            'post_status' => 'publish',
-        ];
+        // Get all professionals from database
+        $table_name = $wpdb->prefix . 'ycp_professionals';
+        $professionals = $wpdb->get_results(
+            "SELECT * FROM $table_name ORDER BY name ASC LIMIT $limit",
+            ARRAY_A
+        );
         
-        $query = new WP_Query($args);
         $available_professionals = [];
         
-        if ($query->have_posts()) {
-            while ($query->have_posts()) {
-                $query->the_post();
-                $professional_id = get_the_ID();
-                $available_dates = get_post_meta($professional_id, self::META_AVAILABLE_DATES, true);
-                $date_array = $this->parse_dates_string($available_dates);
-                
-                if (in_array($date, $date_array)) {
-                    $professional_data = $this->get_professional_meta_data($professional_id);
-                    $available_professionals[] = array_merge($professional_data, [
-                        'is_available_today' => in_array(date('Y-m-d'), $date_array),
-                    ]);
-                }
+        foreach ($professionals as $professional) {
+            $available_dates = $professional['available_dates'] ?? '';
+            $date_array = $this->parse_dates_string($available_dates);
+            
+            if (in_array($date, $date_array)) {
+                $professional_data = $this->get_professional_meta_data_from_db($professional);
+                $available_professionals[] = array_merge($professional_data, [
+                    'is_available_today' => in_array(date('Y-m-d'), $date_array),
+                ]);
             }
         }
-        
-        wp_reset_postdata();
         
         return [
             'date' => $date,
@@ -218,36 +230,32 @@ class YCP_Data_Handler {
      * @return array Array of all professionals with availability
      */
     public function get_all_professionals_availability(int $limit = 100): array {
-        $args = [
-            'post_type' => self::POST_TYPE,
-            'posts_per_page' => $limit,
-            'post_status' => 'publish',
-        ];
+        global $wpdb;
         
-        $query = new WP_Query($args);
-        $professionals = [];
+        // Get all professionals from database
+        $table_name = $wpdb->prefix . 'ycp_professionals';
+        $professionals = $wpdb->get_results(
+            "SELECT * FROM $table_name ORDER BY name ASC LIMIT $limit",
+            ARRAY_A
+        );
         
-        if ($query->have_posts()) {
-            while ($query->have_posts()) {
-                $query->the_post();
-                $professional_id = get_the_ID();
-                $available_dates = get_post_meta($professional_id, self::META_AVAILABLE_DATES, true);
-                $date_array = $this->parse_dates_string($available_dates);
-                
-                $professional_data = $this->get_professional_meta_data($professional_id);
-                $professionals[] = array_merge($professional_data, [
-                    'available_dates' => $date_array,
-                    'is_available_today' => in_array(date('Y-m-d'), $date_array),
-                    'total_available_days' => count($date_array),
-                ]);
-            }
+        $formatted_professionals = [];
+        
+        foreach ($professionals as $professional) {
+            $available_dates = $professional['available_dates'] ?? '';
+            $date_array = $this->parse_dates_string($available_dates);
+            
+            $professional_data = $this->get_professional_meta_data_from_db($professional);
+            $formatted_professionals[] = array_merge($professional_data, [
+                'available_dates' => $date_array,
+                'is_available_today' => in_array(date('Y-m-d'), $date_array),
+                'total_available_days' => count($date_array),
+            ]);
         }
         
-        wp_reset_postdata();
-        
         return [
-            'professionals' => $professionals,
-            'count' => count($professionals),
+            'professionals' => $formatted_professionals,
+            'count' => count($formatted_professionals),
         ];
     }
     
@@ -271,6 +279,22 @@ class YCP_Data_Handler {
         }
         
         return $data;
+    }
+    
+    /**
+     * Get professional meta data from database
+     * 
+     * @param array $professional Professional data from database
+     * @return array Professional meta data
+     */
+    private function get_professional_meta_data_from_db(array $professional): array {
+        return [
+            'id' => $professional['id'],
+            'name' => $professional['name'],
+            'profile_url' => esc_url($professional['profile_url'] ?? ''),
+            'description' => esc_html($professional['description'] ?? ''),
+            'thumbnail_url' => esc_url($professional['image_url'] ?? ''),
+        ];
     }
     
     /**
@@ -483,6 +507,50 @@ class YCP_Data_Handler {
                 return $ycp_data_handler->get_all_professionals_availability($limit);
             }
         }
+        
+        if (!function_exists('ycp_debug_professional')) {
+            function ycp_debug_professional(int $professional_id) {
+                global $ycp_data_handler;
+                if (!$ycp_data_handler) {
+                    $ycp_data_handler = new YCP_Data_Handler();
+                }
+                return $ycp_data_handler->debug_professional($professional_id);
+            }
+        }
+    }
+    
+    /**
+     * Debug method to check if professional exists and get basic info
+     * 
+     * @param int $professional_id The professional's database ID
+     * @return array Debug information
+     */
+    public function debug_professional(int $professional_id): array {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . 'ycp_professionals';
+        
+        // Check if table exists
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_name'") === $table_name;
+        
+        // Get professional data
+        $professional = $wpdb->get_row(
+            $wpdb->prepare("SELECT * FROM $table_name WHERE id = %d", $professional_id),
+            ARRAY_A
+        );
+        
+        // Get all professional IDs for reference
+        $all_ids = $wpdb->get_col("SELECT id FROM $table_name ORDER BY id ASC");
+        
+        return [
+            'table_exists' => $table_exists,
+            'table_name' => $table_name,
+            'requested_id' => $professional_id,
+            'professional_found' => !empty($professional),
+            'professional_data' => $professional,
+            'all_available_ids' => $all_ids,
+            'total_professionals' => count($all_ids),
+        ];
     }
 }
 
