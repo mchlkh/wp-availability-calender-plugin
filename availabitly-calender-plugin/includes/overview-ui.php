@@ -251,9 +251,9 @@ class YCP_Overview_UI {
         
         // Summary cards
         echo '<div class="overview-summary-cards">';
-        $this->render_summary_card($data['total_professionals'], __('Total Professionals', self::TEXT_DOMAIN));
-        $this->render_summary_card($data['available_today'], __('Available Today', self::TEXT_DOMAIN));
-        $this->render_summary_card($data['average_days_per_professional'], __('Avg. Days Available', self::TEXT_DOMAIN));
+        $this->render_summary_card((int) $data['total_professionals'], __('Total Professionals', self::TEXT_DOMAIN));
+        $this->render_summary_card((int) $data['available_today'], __('Available Today', self::TEXT_DOMAIN));
+        $this->render_summary_card((int) $data['average_days_per_professional'], __('Avg. Days Available', self::TEXT_DOMAIN));
         echo '</div>';
         
         // Top professionals

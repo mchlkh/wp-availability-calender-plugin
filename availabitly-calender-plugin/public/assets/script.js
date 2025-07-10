@@ -91,21 +91,17 @@ document.addEventListener('DOMContentLoaded', function () {
         attempts.forEach(delay => {
             setTimeout(() => {
                 const headerTitle = document.querySelector('.ycp-calendar-header h3');
-                console.log(`Attempt after ${delay}ms - Header element found:`, headerTitle); // Debug log
                 
                 if (headerTitle && headerTitle.textContent === 'Heute anwesend') {
                     headerTitle.textContent = 'Die gesamte Royal Crew';
-                    console.log(`Header text changed to "Die gesamte Royal Crew" after ${delay}ms`); // Debug log
                 } else if (headerTitle) {
-                    console.log(`Header already changed or different text: "${headerTitle.textContent}"`);
+                    // console.log(`Header already changed or different text: "${headerTitle.textContent}"`);
                 } else {
-                    console.log(`Header element not found after ${delay}ms - trying alternative selectors`);
+                    // console.log(`Header element not found after ${delay}ms - trying alternative selectors`);
                     // Try alternative selectors
                     const altHeader1 = document.querySelector('h3');
-                    console.log('Alt header 1:', altHeader1);
                     if (altHeader1 && altHeader1.textContent === 'Heute anwesend') {
                         altHeader1.textContent = 'Die gesamte Royal Crew';
-                        console.log(`Header text changed using alt selector after ${delay}ms`);
                     }
                 }
             }, delay);
@@ -117,7 +113,6 @@ document.addEventListener('DOMContentLoaded', function () {
      */
     function applyDynamicTransforms() {
         const professionalCards = document.querySelectorAll('.ycp-pro');
-        console.log(`Applying dynamic transforms to ${professionalCards.length} professional cards`);
         
         // Remove any existing dynamic transform styles
         const existingStyle = document.getElementById('ycp-dynamic-transforms');
@@ -136,7 +131,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const banner = card.querySelector('.ycp-heute-banner');
             
             if (!description || (!name && !banner)) {
-                console.log(`Card ${index}: Skipping - no description or name/banner found`);
+                // console.log(`Card ${index}: Skipping - no description or name/banner found`);
                 return;
             }
             
@@ -169,8 +164,6 @@ document.addEventListener('DOMContentLoaded', function () {
             const baseOffset = 0; // Reduced from 30px to 10px for tighter spacing
             const transformValue = -(descriptionHeight + baseOffset);
             
-            console.log(`Card ${index}: Description height: ${descriptionHeight}px, Transform: ${transformValue}px`);
-            
             // Add CSS rules for this specific card
             styleContent += `
                 .ycp-pro[data-card-id="${cardId}"]:hover h4,
@@ -188,9 +181,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (styleContent) {
             style.textContent = styleContent;
             document.head.appendChild(style);
-            console.log('Dynamic transform styles applied successfully');
         } else {
-            console.log('No dynamic transform styles to apply');
+            // console.log('No dynamic transform styles to apply');
         }
     }
 
@@ -199,10 +191,8 @@ document.addEventListener('DOMContentLoaded', function () {
             fetchAllProfessionals();
             if (calendar && typeof calendar.clear === 'function') {
                 // Clear the selected date completely
-                console.log('Before clearing - selected dates:', calendar.selectedDates);
                 calendar.clear();
                 calendar.setDate(null);
-                console.log('After clearing - selected dates:', calendar.selectedDates);
                 
                 // Also remove any visual selection styling from the calendar container
                 setTimeout(() => {
@@ -225,19 +215,8 @@ document.addEventListener('DOMContentLoaded', function () {
                         allSelectedDays.forEach(day => {
                             day.classList.remove('selected');
                         });
-                        
-                        console.log('Date selection cleared from ycp-calendar-container');
-                        
-                        // Debug: Log all remaining classes on calendar days
-                        const allDays = calendarContainer.querySelectorAll('.flatpickr-day');
-                        console.log('All calendar days after clearing:', allDays.length);
-                        allDays.forEach((day, index) => {
-                            if (day.classList.contains('selected') || day.classList.contains('today')) {
-                                console.log(`Day ${index}: classes = ${day.className}, text = "${day.textContent}"`);
-                            }
-                        });
                     } else {
-                        console.log('ycp-calendar-container not found, clearing globally');
+                        // console.log('ycp-calendar-container not found, clearing globally');
                         // Fallback to global clearing
                         const selectedDays = document.querySelectorAll('.flatpickr-day.selected');
                         selectedDays.forEach(day => {
@@ -246,14 +225,13 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 }, 100);
             } else {
-                console.log('Calendar object not available, clearing selection manually');
+                // console.log('Calendar object not available, clearing selection manually');
                 // Fallback: Clear selection manually without calendar object
                 setTimeout(() => {
                     const allSelectedDays = document.querySelectorAll('.flatpickr-day.selected');
                     allSelectedDays.forEach(day => {
                         day.classList.remove('selected');
                     });
-                    console.log('Manual date selection clearing completed');
                 }, 100);
             }
             // Header text will be changed in fetchAllProfessionals after content loads
@@ -378,7 +356,7 @@ document.addEventListener('DOMContentLoaded', function () {
         // Function to ensure mobile shows only one month, larger screens show two
         function enforceMobileMonthCount() {
             if (!calendar || !calendar.config) {
-                console.log('Calendar not ready for mobile month count enforcement');
+                // console.log('Calendar not ready for mobile month count enforcement');
                 return;
             }
             const isPhone = window.innerWidth < 480;
