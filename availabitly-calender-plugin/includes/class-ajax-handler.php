@@ -77,8 +77,35 @@ class YCP_Ajax_Handler {
             $professionals = $this->professional_manager->get_professionals_for_date($date);
             $found_professionals = !empty($professionals);
             
+            // Render available professionals for selected date
             $output = $this->display_handler->render_professionals_list($professionals);
             $output .= $this->display_handler->render_availability_data_attributes($found_professionals, $date);
+
+            // Append the full crew (all other professionals not already listed)
+            $all_professionals_raw = $this->professional_manager->get_all_professionals();
+            $all_professionals_formatted = [];
+            foreach ($all_professionals_raw as $professional_raw) {
+                $all_professionals_formatted[] = $this->professional_manager->format_professional_for_frontend($professional_raw);
+            }
+
+            // Build a set of IDs already shown in the available list
+            $available_ids = array_map(static function($p) { return $p['id']; }, $professionals);
+
+            // Filter to only those not in the available list
+            $other_professionals = array_values(array_filter($all_professionals_formatted, static function($p) use ($available_ids) {
+                return !in_array($p['id'], $available_ids, true);
+            }));
+
+            if (!empty($other_professionals)) {
+                // Use the same header styling as the main calendar header
+                $crew_header = '<div class="ycp-calendar-header"><h3>' . esc_html__(
+                    'Die gesamte Royal Crew',
+                    self::TEXT_DOMAIN
+                ) . '</h3></div>';
+                $output .= '<div class="ycp-crew-section">' . $crew_header;
+                $output .= $this->display_handler->render_professionals_list($other_professionals);
+                $output .= '</div>';
+            }
             
             echo $output;
             wp_die();
