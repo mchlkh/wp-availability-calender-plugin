@@ -198,7 +198,7 @@ class YCP_Data_Handler {
         // Get all professionals from database
         $table_name = $wpdb->prefix . 'ycp_professionals';
         $professionals = $wpdb->get_results(
-            "SELECT * FROM $table_name ORDER BY name ASC LIMIT $limit",
+            "SELECT * FROM $table_name ORDER BY display_order ASC, name ASC LIMIT $limit",
             ARRAY_A
         );
         
@@ -235,7 +235,7 @@ class YCP_Data_Handler {
         // Get all professionals from database
         $table_name = $wpdb->prefix . 'ycp_professionals';
         $professionals = $wpdb->get_results(
-            "SELECT * FROM $table_name ORDER BY name ASC LIMIT $limit",
+            "SELECT * FROM $table_name ORDER BY display_order ASC, name ASC LIMIT $limit",
             ARRAY_A
         );
         

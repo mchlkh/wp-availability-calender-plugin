@@ -63,6 +63,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function initProfessionalsAdmin() {
         const form = document.getElementById('ycp-professional-form');
         const dateInput = document.getElementById('ycp_available_dates');
+        const displayOrderInput = document.getElementById('ycp_display_order');
         const uploadButton = document.getElementById('ycp_upload_image');
         const resetButton = document.getElementById('ycp_reset_form');
         
@@ -248,6 +249,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.getElementById('ycp_profile_url').value = professional.profile_url || '';
                 document.getElementById('ycp_image_url').value = professional.image_url || '';
                 document.getElementById('ycp_available_dates').value = professional.available_dates || '';
+                if (document.getElementById('ycp_display_order')) {
+                    document.getElementById('ycp_display_order').value = parseInt(professional.display_order || 0, 10);
+                }
                 
                 // Update date picker
                 const dateInput = document.getElementById('ycp_available_dates');
@@ -318,6 +322,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         ${escapeHtml(professional.name)}
                         <span class="ycp-professional-id">(ID: ${professional.id})</span>
                     </h3>
+                    <p><em>Order: ${typeof professional.display_order !== 'undefined' ? professional.display_order : 0}</em></p>
                     ${professional.image_url ? `<img src="${escapeHtml(professional.image_url)}" class="ycp-image-preview" alt="">` : ''}
                     ${professional.description ? `<p>${escapeHtml(professional.description)}</p>` : ''}
                     ${professional.available_dates ? `<p><strong>Available Dates:</strong> ${escapeHtml(professional.available_dates)}</p>` : ''}

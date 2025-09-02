@@ -77,6 +77,7 @@ class YCP_Professional_Manager {
             profile_url varchar(500),
             image_url varchar(500),
             available_dates text,
+            display_order int NOT NULL DEFAULT 0,
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
             updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id)
@@ -162,6 +163,16 @@ class YCP_Professional_Manager {
                                 <td>
                                     <input type="text" id="ycp_available_dates" name="available_dates" class="regular-text" readonly>
                                     <p class="description"><?php esc_html_e('Click to select dates', self::TEXT_DOMAIN); ?></p>
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <th scope="row">
+                                    <label for="ycp_display_order"><?php esc_html_e('Display Order:', self::TEXT_DOMAIN); ?></label>
+                                </th>
+                                <td>
+                                    <input type="number" id="ycp_display_order" name="display_order" class="small-text" value="0" min="0" step="1">
+                                    <p class="description"><?php esc_html_e('Lower numbers appear first.', self::TEXT_DOMAIN); ?></p>
                                 </td>
                             </tr>
                         </table>
@@ -285,6 +296,7 @@ class YCP_Professional_Manager {
                     <?php echo esc_html($professional['name']); ?>
                     <span class="ycp-professional-id">(ID: <?php echo esc_html($professional['id']); ?>)</span>
                 </h3>
+                <p><em><?php esc_html_e('Order', self::TEXT_DOMAIN); ?>: <?php echo isset($professional['display_order']) ? intval($professional['display_order']) : 0; ?></em></p>
                 
                 <?php if (!empty($professional['image_url'])): ?>
                     <img src="<?php echo esc_url($professional['image_url']); ?>" class="ycp-image-preview" alt="">
@@ -372,6 +384,7 @@ class YCP_Professional_Manager {
         $profile_url = sanitize_url($_POST['profile_url'] ?? '');
         $image_url = sanitize_url($_POST['image_url'] ?? '');
         $available_dates = sanitize_text_field($_POST['available_dates'] ?? '');
+        $display_order = intval($_POST['display_order'] ?? 0);
         
         if (empty($name)) {
             wp_send_json_error(['message' => __('Name is required.', self::TEXT_DOMAIN)]);
@@ -382,7 +395,8 @@ class YCP_Professional_Manager {
             'description' => $description,
             'profile_url' => $profile_url,
             'image_url' => $image_url,
-            'available_dates' => $available_dates
+            'available_dates' => $available_dates,
+            'display_order' => $display_order
         ];
         
         if ($professional_id > 0) {
@@ -473,7 +487,7 @@ class YCP_Professional_Manager {
         $result = $wpdb->insert(
             $table_name,
             $data,
-            ['%s', '%s', '%s', '%s', '%s']
+            ['%s', '%s', '%s', '%s', '%s', '%d']
         );
         
         return $result !== false;
@@ -491,7 +505,7 @@ class YCP_Professional_Manager {
             $table_name,
             $data,
             ['id' => $id],
-            ['%s', '%s', '%s', '%s', '%s'],
+            ['%s', '%s', '%s', '%s', '%s', '%d'],
             ['%d']
         );
         
@@ -540,7 +554,7 @@ class YCP_Professional_Manager {
         $table_name = $wpdb->prefix . self::TABLE_NAME;
         
         $professionals = $wpdb->get_results(
-            "SELECT * FROM $table_name ORDER BY name ASC",
+            "SELECT * FROM $table_name ORDER BY display_order ASC, name ASC",
             ARRAY_A
         );
         
