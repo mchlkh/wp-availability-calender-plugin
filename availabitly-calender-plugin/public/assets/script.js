@@ -58,6 +58,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const resultsContainer = document.getElementById('ycp-results');
     const showAllBtn = document.getElementById('ycp-show-all-btn');
     let calendar;
+    // Track whether the crew preview has been expanded by the user
+    let crewPreviewExpanded = false;
     
     function fetchAllProfessionals() {
         if (!resultsContainer) return;
@@ -71,6 +73,8 @@ document.addEventListener('DOMContentLoaded', function () {
             })
             .then(html => {
                 resultsContainer.innerHTML = html;
+                // Reset expanded state on full list load
+                crewPreviewExpanded = false;
                 // Change header text after content is loaded
                 changeHeaderText();
                 // Apply dynamic transforms based on description height
@@ -131,6 +135,24 @@ document.addEventListener('DOMContentLoaded', function () {
         const cards = Array.from(list.querySelectorAll('.ycp-pro'));
         if (!cards.length) return;
 
+        // If user already expanded, keep everything visible and skip re-applying preview
+        if (crewPreviewExpanded) {
+            cards.forEach(card => {
+                card.classList.remove('ycp-pro-hidden');
+                card.classList.remove('ycp-pro-dimmed');
+                const imageContainer = card.querySelector('.image-container');
+                const cardFade = imageContainer ? imageContainer.querySelector('.ycp-card-fade') : null;
+                if (cardFade) cardFade.remove();
+            });
+            const oldFade = list.querySelector('.ycp-crew-fade');
+            if (oldFade) oldFade.remove();
+            const oldShowOverlay = list.querySelector('.ycp-crew-show-more');
+            if (oldShowOverlay) oldShowOverlay.remove();
+            const oldShowBelow = document.querySelector('.ycp-crew-show-more-below');
+            if (oldShowBelow) oldShowBelow.remove();
+            return;
+        }
+
         // Determine current column count from the grid to always keep exactly two rows visible
         const gridTemplate = window.getComputedStyle(list).getPropertyValue('grid-template-columns');
         const columnCount = Math.max(1, (gridTemplate || '').split(' ').filter(Boolean).length);
@@ -185,7 +207,9 @@ document.addEventListener('DOMContentLoaded', function () {
             window.addEventListener('resize', () => {
                 clearTimeout(resizeTimeout);
                 resizeTimeout = setTimeout(() => {
-                    applyCrewPreview();
+                    if (!crewPreviewExpanded) {
+                        applyCrewPreview();
+                    }
                 }, 50); // debounce to allow grid to settle
             });
         }
@@ -205,6 +229,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (cardFade) cardFade.remove();
             });
             showMoreContainer.remove();
+            crewPreviewExpanded = true;
         });
         showMoreContainer.appendChild(btn);
         crewSection.appendChild(showMoreContainer);
@@ -215,11 +240,18 @@ document.addEventListener('DOMContentLoaded', function () {
      */
     function applyDynamicTransforms() {
         const professionalCards = document.querySelectorAll('.ycp-pro');
-        
+
         // Remove any existing dynamic transform styles
         const existingStyle = document.getElementById('ycp-dynamic-transforms');
         if (existingStyle) {
             existingStyle.remove();
+        }
+
+        // Do not apply hover-based transforms on touch/mobile devices
+        const isTouchOrCoarse = window.matchMedia('(hover: none), (pointer: coarse)').matches;
+        const isSmallViewport = window.innerWidth < 768;
+        if (isTouchOrCoarse || isSmallViewport) {
+            return;
         }
         
         // Create a single style element for all dynamic transforms
@@ -365,6 +397,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 })
                 .then(html => {
                     resultsContainer.innerHTML = html;
+                    // Reset expanded state on new date load
+                    crewPreviewExpanded = false;
                     
                     // Check if professionals are available for the selected date
                     const availabilityData = resultsContainer.querySelector('.ycp-availability-data');

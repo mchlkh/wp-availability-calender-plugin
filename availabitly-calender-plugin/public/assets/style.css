@@ -414,6 +414,18 @@ html, body {
     border-top: 1px solid #e0e0e0;
 }
 
+/* Phone-only: show two smaller cards per row in the full crew section */
+@media (max-width: 479px) {
+    .ycp-crew-section .ycp-pro-list {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+        padding: 0 10px;
+    }
+    .ycp-crew-section .ycp-pro {
+        width: 100%;
+    }
+}
+
 .ycp-pro .description {
     position: absolute;
     left: 0;
@@ -435,6 +447,55 @@ html, body {
 .ycp-pro:focus-within .description {
     transform: translateY(0);
     opacity: 1;
+}
+
+/* Disable hover effects on touch/mobile devices */
+@media (hover: none), (pointer: coarse), (max-width: 767px) {
+    .ycp-pro:hover .description,
+    .ycp-pro:focus-within .description {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    /* Prevent name/title and banner from moving on tap */
+    .ycp-pro h4,
+    .ycp-pro .ycp-heute-banner,
+    .ycp-pro .text-overlay {
+        transform: none !important;
+        transition: none !important;
+    }
+    .ycp-pro:hover h4,
+    .ycp-pro:focus-within h4,
+    .ycp-pro:hover .ycp-heute-banner,
+    .ycp-pro:focus-within .ycp-heute-banner,
+    .ycp-pro:hover .text-overlay,
+    .ycp-pro:focus-within .text-overlay {
+        transform: none !important;
+    }
+    /* Keep overlay background steady on tap */
+    .ycp-pro:hover .text-overlay-bg,
+    .ycp-pro:focus-within .text-overlay-bg {
+        background: linear-gradient(to top, rgba(0,0,0,0.8), rgba(0,0,0,0.4) 60%, transparent) !important;
+    }
+    /* Neutralize any remaining hover/active/ focus visual changes */
+    .ycp-pro,
+    .ycp-pro * {
+        transition: none !important;
+    }
+    .ycp-pro:hover,
+    .ycp-pro:active,
+    .ycp-pro:focus,
+    .ycp-pro:focus-within {
+        background: transparent !important;
+        outline: none !important;
+    }
+    .ycp-pro:hover .image-container,
+    .ycp-pro:focus-within .image-container,
+    .ycp-pro:hover img,
+    .ycp-pro:focus-within img,
+    .ycp-pro:hover .text-overlay,
+    .ycp-pro:focus-within .text-overlay {
+        background: transparent !important;
+    }
 }
 
 .ycp-pro:hover h4,
