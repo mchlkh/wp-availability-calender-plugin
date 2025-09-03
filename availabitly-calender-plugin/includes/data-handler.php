@@ -64,6 +64,10 @@ class YCP_Data_Handler {
         
         // Register global functions
         add_action('init', [$this, 'register_availability_functions']);
+           
+        // Schedule and wire daily cleanup for past availability dates
+        add_action('init', [$this, 'maybe_schedule_daily_cleanup']);
+        add_action('ycp_daily_cleanup_event', [$this, 'cleanup_past_availability']);
     }
     
     /**
@@ -279,6 +283,101 @@ class YCP_Data_Handler {
         }
         
         return $data;
+    }
+
+    /**
+     * Ensure our daily cleanup event is scheduled
+     */
+    public function maybe_schedule_daily_cleanup(): void {
+        if (!wp_next_scheduled('ycp_daily_cleanup_event')) {
+            // Schedule to run daily starting now
+            wp_schedule_event(time(), 'daily', 'ycp_daily_cleanup_event');
+        }
+    }
+
+    /**
+     * Remove past availability dates from the custom professionals table
+     *
+     * Uses site-local time via current_time('Y-m-d'). Keeps today and future dates.
+     * Logs summary when WP_DEBUG is enabled.
+     */
+    public function cleanup_past_availability(): void {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . 'ycp_professionals';
+        
+        // Verify table exists
+        $table_exists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table_name)) === $table_name;
+        if (!$table_exists) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('[YCP] cleanup_past_availability: Table not found: ' . $table_name);
+            }
+            return;
+        }
+        
+        $today = current_time('Y-m-d');
+        
+        // Fetch only rows that have any dates
+        $rows = $wpdb->get_results(
+            "SELECT id, available_dates FROM $table_name WHERE available_dates IS NOT NULL AND available_dates <> ''",
+            ARRAY_A
+        );
+        
+        if (empty($rows)) {
+            return;
+        }
+        
+        $total_processed = 0;
+        $total_updated = 0;
+        $total_dates_removed = 0;
+        
+        foreach ($rows as $row) {
+            $total_processed++;
+            $id = (int) $row['id'];
+            $dates_string = (string) $row['available_dates'];
+            $dates = $this->parse_dates_string($dates_string);
+            if (empty($dates)) {
+                // Normalize empty/invalid data to empty string
+                if ($dates_string !== '') {
+                    $wpdb->update(
+                        $table_name,
+                        ['available_dates' => ''],
+                        ['id' => $id],
+                        ['%s'],
+                        ['%d']
+                    );
+                    $total_updated++;
+                }
+                continue;
+            }
+            
+            $filtered = array_values(array_filter($dates, function(string $date) use ($today): bool {
+                // Keep dates that are today or in the future
+                return $date >= $today;
+            }));
+            
+            $removed_count = count($dates) - count($filtered);
+            if ($removed_count <= 0) {
+                continue;
+            }
+            
+            $new_value = implode(',', $filtered);
+            $updated = $wpdb->update(
+                $table_name,
+                ['available_dates' => $new_value],
+                ['id' => $id],
+                ['%s'],
+                ['%d']
+            );
+            if ($updated !== false) {
+                $total_updated++;
+                $total_dates_removed += $removed_count;
+            }
+        }
+        
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log(sprintf('[YCP] cleanup_past_availability completed: processed=%d, updated=%d, dates_removed=%d', $total_processed, $total_updated, $total_dates_removed));
+        }
     }
     
     /**
