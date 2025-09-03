@@ -75,6 +75,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 changeHeaderText();
                 // Apply dynamic transforms based on description height
                 applyDynamicTransforms();
+                // Apply crew preview on full list
+                setTimeout(applyCrewPreview, 50);
             })
             .catch(error => {
                 console.error('Error fetching all professionals:', error);
@@ -106,6 +108,106 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }, delay);
         });
+    }
+
+    /**
+     * Apply preview limiting/dimming to the Royal Crew section when configured
+     */
+    function applyCrewPreview() {
+        const calendarContainer = document.getElementById('ycp-calendar-container');
+        if (!calendarContainer) return;
+        const enablePreview = (calendarContainer.getAttribute('data-crew-preview') || 'false') === 'true';
+        if (!enablePreview) return;
+
+        const limitAttr = parseInt(calendarContainer.getAttribute('data-crew-limit') || '0', 10);
+        const buttonText = calendarContainer.getAttribute('data-crew-button-text') || 'MEHR ANZEIGEN';
+
+        const crewSection = document.querySelector('.ycp-crew-section');
+        if (!crewSection) return; // Only exists on date-selection response
+        
+        const list = crewSection.querySelector('.ycp-pro-list');
+        if (!list) return;
+        
+        const cards = Array.from(list.querySelectorAll('.ycp-pro'));
+        if (!cards.length) return;
+
+        // Determine current column count from the grid to always keep exactly two rows visible
+        const gridTemplate = window.getComputedStyle(list).getPropertyValue('grid-template-columns');
+        const columnCount = Math.max(1, (gridTemplate || '').split(' ').filter(Boolean).length);
+        // Always enforce exactly two rows in preview, regardless of any static limit
+        const computedTwoRows = columnCount * 2;
+        const visibleCount = Math.min(cards.length, computedTwoRows);
+
+        // Clean up previous UI if any
+        const oldFade = list.querySelector('.ycp-crew-fade');
+        if (oldFade) oldFade.remove();
+        const oldShowOverlay = list.querySelector('.ycp-crew-show-more');
+        if (oldShowOverlay) oldShowOverlay.remove();
+        const oldShowBelow = crewSection.querySelector('.ycp-crew-show-more-below');
+        if (oldShowBelow) oldShowBelow.remove();
+
+        // Show ONLY the FIRST visibleCount items to preserve the configured order
+        // Everything after that is hidden. This ensures preview respects global ordering.
+        cards.forEach((card, index) => {
+            if (index >= visibleCount) {
+                card.classList.add('ycp-pro-hidden');
+                card.classList.remove('ycp-pro-dimmed');
+            } else {
+                card.classList.remove('ycp-pro-hidden');
+                card.classList.remove('ycp-pro-dimmed');
+            }
+        });
+
+        // Add per-card fade overlays only for the LAST visible row
+        // Compute the last visible row within the FIRST visibleCount items
+        let lastRowCount = visibleCount % columnCount;
+        if (lastRowCount === 0) lastRowCount = Math.min(columnCount, visibleCount);
+        const lastRowStartIndex = Math.max(0, visibleCount - lastRowCount);
+        cards.forEach((card, index) => {
+            const imageContainer = card.querySelector('.image-container');
+            if (!imageContainer) return;
+            let cardFade = imageContainer.querySelector('.ycp-card-fade');
+            if (index >= lastRowStartIndex) {
+                if (!cardFade) {
+                    cardFade = document.createElement('div');
+                    cardFade.className = 'ycp-card-fade';
+                    imageContainer.appendChild(cardFade);
+                }
+            } else if (cardFade) {
+                cardFade.remove();
+            }
+        });
+
+        // Recompute on resize to keep exactly two rows visible (bind once)
+        if (!window.__ycpCrewResizeBound) {
+            window.__ycpCrewResizeBound = true;
+            let resizeTimeout;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    applyCrewPreview();
+                }, 50); // debounce to allow grid to settle
+            });
+        }
+
+        // Create Show More button below the images
+        const showMoreContainer = document.createElement('div');
+        showMoreContainer.className = 'ycp-crew-show-more-below';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'ycp-show-all-button';
+        btn.textContent = buttonText;
+        btn.addEventListener('click', () => {
+            cards.forEach(card => {
+                card.classList.remove('ycp-pro-hidden');
+                const imageContainer = card.querySelector('.image-container');
+                const cardFade = imageContainer ? imageContainer.querySelector('.ycp-card-fade') : null;
+                if (cardFade) cardFade.remove();
+            });
+            showMoreContainer.remove();
+        });
+        showMoreContainer.appendChild(btn);
+        crewSection.appendChild(showMoreContainer);
     }
 
     /**
@@ -288,6 +390,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     // Apply dynamic transforms after content is loaded
                     setTimeout(() => {
                         applyDynamicTransforms();
+                        // Apply crew preview to the crew section appended under date results
+                        applyCrewPreview();
                     }, 100);
                 })
                 .catch(error => {

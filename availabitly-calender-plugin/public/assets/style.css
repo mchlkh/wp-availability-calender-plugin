@@ -55,8 +55,8 @@ html, body {
 
 /* Style for the "Show all Royal Crew" button */
 .ycp-show-all-button {
-    background-color: transparent;
-    color: inherit;
+    background-color: #b5a898; /* solid, not transparent */
+    color: #111; /* ensure readable text on solid background */
     border: 1px solid #b5a898;
     border-radius: 0;
     padding: 10px 20px;
@@ -74,11 +74,11 @@ html, body {
 }
 
 .ycp-show-all-button:hover {
-    background-color: rgba(181, 168, 152, 0.1);
+    background-color: #a39280; /* slightly darker on hover */
 }
 
 .ycp-show-all-button:active {
-    background-color: rgba(181, 168, 152, 0.2);
+    background-color: #958671; /* pressed state */
     transform: translateY(1px);
 }
 
@@ -129,6 +129,54 @@ html, body {
 /* Hidden header class */
 .ycp-header-hidden {
     display: none !important;
+}
+
+/* Crew preview: dimmed cards beyond the preview limit */
+.ycp-pro-dimmed {
+    opacity: 0.35;
+    filter: grayscale(35%);
+    transition: opacity 0.3s ease, filter 0.3s ease;
+}
+
+/* Crew preview: hide completely for true preview */
+.ycp-pro-hidden {
+    display: none !important;
+}
+
+/* New container for the Mehr anzeigen button placed below the images */
+.ycp-crew-show-more-below {
+    text-align: center;
+    padding: 45px 0 10px;
+    display: flex;
+    justify-content: center;
+}
+
+.ycp-crew-show-more-below .ycp-show-all-button {
+    width: auto;
+    min-width: 200px;
+    margin: 0 auto;
+}
+
+/* Subtle gradient fade at the bottom of the preview list */
+.ycp-crew-fade {
+    position: absolute;
+    bottom: 0;
+    height: 360px; /* cover most of the image */
+    background: linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.95) 100%);
+    pointer-events: none;
+    z-index: 20;
+}
+
+/* Per-card fade overlay for the last visible row */
+.ycp-card-fade {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 100%;
+    background: linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 100%);
+    pointer-events: none;
+    z-index: 6; /* above text/name to dim them too */
 }
 
 .ycp-calendar-wrapper {
@@ -182,6 +230,7 @@ html, body {
     color: inherit;
     font-family: inherit;
     box-sizing: border-box;
+    position: relative; /* allow absolute fade/button overlay */
 }
 
 @media (min-width: 480px) {
@@ -288,7 +337,7 @@ html, body {
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 2;
+    z-index: 3; /* ensure text sits above card fade */
     padding: 20px 15px;
     display: flex;
     flex-direction: column;
@@ -966,6 +1015,7 @@ html, body {
 .ycp-pro:hover .text-overlay,
 .ycp-pro:focus-within .text-overlay {
     background: transparent;
+    z-index: 3; /* ensure above ycp-card-fade */
 }
 
 .ycp-pro:hover .text-overlay-bg,

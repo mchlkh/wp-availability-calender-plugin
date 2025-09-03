@@ -88,22 +88,19 @@ class YCP_Ajax_Handler {
                 $all_professionals_formatted[] = $this->professional_manager->format_professional_for_frontend($professional_raw);
             }
 
-            // Build a set of IDs already shown in the available list
-            $available_ids = array_map(static function($p) { return $p['id']; }, $professionals);
+            // For the Royal Crew section we want to show the full ordered list again,
+            // regardless of whether some professionals were already shown as available above.
+            // This preserves the global ordering and avoids confusing gaps in preview mode.
+            $crew_professionals = $all_professionals_formatted;
 
-            // Filter to only those not in the available list
-            $other_professionals = array_values(array_filter($all_professionals_formatted, static function($p) use ($available_ids) {
-                return !in_array($p['id'], $available_ids, true);
-            }));
-
-            if (!empty($other_professionals)) {
+            if (!empty($crew_professionals)) {
                 // Use the same header styling as the main calendar header
                 $crew_header = '<div class="ycp-calendar-header"><h3>' . esc_html__(
                     'Die gesamte Royal Crew',
                     self::TEXT_DOMAIN
                 ) . '</h3></div>';
                 $output .= '<div class="ycp-crew-section">' . $crew_header;
-                $output .= $this->display_handler->render_professionals_list($other_professionals);
+                $output .= $this->display_handler->render_professionals_list($crew_professionals);
                 $output .= '</div>';
             }
             

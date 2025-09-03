@@ -39,3 +39,6 @@ wp --path=/var/www/html cron event schedule ycp_daily_cleanup_event now daily
 
 # verify again
 wp --path=/var/www/html cron event list | grep ycp_daily_cleanup_event | cat
+
+# enable the plugin to not show all ladies at once
+[ycp_calendar crew_preview="true" crew_limit="4" crew_button_text="MEHR ANZEIGEN"]

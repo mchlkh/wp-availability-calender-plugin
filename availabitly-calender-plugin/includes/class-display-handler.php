@@ -48,12 +48,24 @@ class YCP_Display_Handler {
     /**
      * Render calendar shortcode
      */
-    public function render_calendar_shortcode(): string {
+    public function render_calendar_shortcode(array $atts = []): string {
         $options = get_option('ycp_color_options', []);
         $container_class = $this->get_container_class($options);
+
+        // Shortcode attributes to control Royal Crew preview behavior
+        $atts = shortcode_atts([
+            'crew_preview' => 'false', // 'true' to enable preview limiting for the crew section
+            'crew_limit' => 4,         // number of cards to show initially
+            'crew_button_text' => __('MEHR ANZEIGEN', self::TEXT_DOMAIN)
+        ], $atts, 'ycp_calendar');
+        
+        $crew_preview = $atts['crew_preview'] === 'true' ? 'true' : 'false';
+        $crew_limit = (int) $atts['crew_limit'];
+        $crew_button_text = esc_attr($atts['crew_button_text']);
         
         ob_start();
-        echo '<div id="ycp-calendar-container" ' . $container_class . '>';
+        // Attach data attributes so the frontend JS can pick up config
+        echo '<div id="ycp-calendar-container" ' . $container_class . ' data-crew-preview="' . $crew_preview . '" data-crew-limit="' . $crew_limit . '" data-crew-button-text="' . $crew_button_text . '">';
         include plugin_dir_path(dirname(__FILE__)) . 'public/frontend-display.php';
         echo '</div>';
         
