@@ -67,8 +67,7 @@ class YCP_Overview_UI {
         add_shortcode('ycp_availability_chart', [$this, 'render_chart_shortcode']);
         add_shortcode('ycp_availability_list', [$this, 'render_list_shortcode']);
         
-        // Enqueue assets
-        add_action('wp_enqueue_scripts', [$this, 'enqueue_overview_assets']);
+        // Assets will be enqueued only when shortcodes render
         
         // Add AJAX handlers
         add_action('wp_ajax_ycp_get_overview_data', [$this, 'handle_get_overview_data']);
@@ -139,6 +138,8 @@ class YCP_Overview_UI {
      * Render overview shortcode
      */
     public function render_overview_shortcode(array $atts = []): string {
+        // Enqueue front-end assets only when shortcode is used
+        $this->enqueue_overview_assets();
         $atts = shortcode_atts([
             'view' => 'calendar', // calendar, list, chart, summary
             'date_range' => 30,
@@ -496,27 +497,19 @@ class YCP_Overview_UI {
     }
 }
 
-// Initialize the overview UI
-global $ycp_overview_ui;
-$ycp_overview_ui = new YCP_Overview_UI();
+// Removed global initializers to avoid side effects at file load.
 
-// Register global functions for theme integration
+// Back-compat helper functions without globals
 if (!function_exists('ycp_render_availability_overview')) {
     function ycp_render_availability_overview(array $options = []) {
-        global $ycp_overview_ui;
-        if (!$ycp_overview_ui) {
-            $ycp_overview_ui = new YCP_Overview_UI();
-        }
-        return $ycp_overview_ui->render_theme_overview($options);
+        $ui = new YCP_Overview_UI();
+        return $ui->render_theme_overview($options);
     }
 }
 
 if (!function_exists('ycp_get_overview_data')) {
     function ycp_get_overview_data(array $options = []) {
-        global $ycp_overview_ui;
-        if (!$ycp_overview_ui) {
-            $ycp_overview_ui = new YCP_Overview_UI();
-        }
-        return $ycp_overview_ui->get_overview_data($options);
+        $ui = new YCP_Overview_UI();
+        return $ui->get_overview_data($options);
     }
-} 
+}

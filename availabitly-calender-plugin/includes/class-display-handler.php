@@ -49,6 +49,16 @@ class YCP_Display_Handler {
      * Render calendar shortcode
      */
     public function render_calendar_shortcode(array $atts = []): string {
+        // Enqueue assets needed for calendar display only when shortcode is used
+        if (function_exists('wp_enqueue_style')) {
+            wp_enqueue_style('flatpickr-style');
+            wp_enqueue_style('ycp-style');
+        }
+        if (function_exists('wp_enqueue_script')) {
+            wp_enqueue_script('flatpickr');
+            wp_enqueue_script('ycp-availability-api');
+            wp_enqueue_script('ycp-script');
+        }
         $options = get_option('ycp_color_options', []);
         $container_class = $this->get_container_class($options);
 
@@ -76,6 +86,9 @@ class YCP_Display_Handler {
      * Render today simple shortcode
      */
     public function render_today_simple_shortcode(array $atts = []): string {
+        if (function_exists('wp_enqueue_style')) {
+            wp_enqueue_style('ycp-style');
+        }
         $options = get_option('ycp_color_options', []);
         $container_class = $this->get_container_class($options);
         
@@ -105,6 +118,9 @@ class YCP_Display_Handler {
      * Render availability data shortcode
      */
     public function render_availability_data_shortcode(array $atts = []): string {
+        if (function_exists('wp_enqueue_style')) {
+            wp_enqueue_style('ycp-style');
+        }
         $atts = shortcode_atts([
             'professional_id' => 0,
             'date_from' => '',

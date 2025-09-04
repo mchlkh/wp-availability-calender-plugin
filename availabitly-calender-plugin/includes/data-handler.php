@@ -56,7 +56,7 @@ class YCP_Data_Handler {
      * Initialize WordPress hooks
      */
     private function init_hooks(): void {
-        // Register AJAX handlers
+        // Register AJAX handlers (public read access via nonce)
         add_action('wp_ajax_ycp_get_availability_data', [$this, 'handle_get_availability_data']);
         add_action('wp_ajax_nopriv_ycp_get_availability_data', [$this, 'handle_get_availability_data']);
         add_action('wp_ajax_ycp_get_compact_availability_data', [$this, 'handle_get_compact_availability_data']);
@@ -74,14 +74,9 @@ class YCP_Data_Handler {
      * Handle AJAX request for availability data
      */
     public function handle_get_availability_data(): void {
-        // Verify nonce for security
+        // Verify nonce for security; public read endpoint
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], self::NONCE_ACTION)) {
             wp_send_json_error(['message' => 'Security check failed'], 403);
-        }
-        
-        // Check user permissions
-        if (!current_user_can(self::REQUIRED_CAPABILITY)) {
-            wp_send_json_error(['message' => 'Insufficient permissions'], 403);
         }
         
         $professional_id = isset($_POST['professional_id']) ? absint($_POST['professional_id']) : 0;
@@ -106,14 +101,9 @@ class YCP_Data_Handler {
      * Handle AJAX request for compact availability data
      */
     public function handle_get_compact_availability_data(): void {
-        // Verify nonce for security
+        // Verify nonce for security; public read endpoint
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], self::NONCE_ACTION)) {
             wp_send_json_error(['message' => 'Security check failed'], 403);
-        }
-        
-        // Check user permissions
-        if (!current_user_can(self::REQUIRED_CAPABILITY)) {
-            wp_send_json_error(['message' => 'Insufficient permissions'], 403);
         }
         
         $professional_id = isset($_POST['professional_id']) ? absint($_POST['professional_id']) : 0;
@@ -178,7 +168,7 @@ class YCP_Data_Handler {
         
         return array_merge($professional_data, [
             'available_dates' => $date_array,
-            'is_available_today' => in_array(date('Y-m-d'), $date_array),
+            'is_available_today' => in_array(date('Y-m-d'), $date_array, true),
             'total_available_days' => count($date_array),
         ]);
     }
@@ -212,10 +202,10 @@ class YCP_Data_Handler {
             $available_dates = $professional['available_dates'] ?? '';
             $date_array = $this->parse_dates_string($available_dates);
             
-            if (in_array($date, $date_array)) {
+            if (in_array($date, $date_array, true)) {
                 $professional_data = $this->get_professional_meta_data_from_db($professional);
                 $available_professionals[] = array_merge($professional_data, [
-                    'is_available_today' => in_array(date('Y-m-d'), $date_array),
+                    'is_available_today' => in_array(date('Y-m-d'), $date_array, true),
                 ]);
             }
         }
@@ -653,6 +643,4 @@ class YCP_Data_Handler {
     }
 }
 
-// Initialize the data handler
-global $ycp_data_handler;
-$ycp_data_handler = new YCP_Data_Handler();
+// Removed global initializer to avoid side effects at file load.

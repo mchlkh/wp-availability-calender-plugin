@@ -137,20 +137,22 @@ class Availability_Calendar_Plugin {
      * Register WordPress hooks
      */
     private function register_hooks(): void {
-        // Script and style enqueuing
-        add_action('wp_enqueue_scripts', [$this, 'enqueue_frontend_assets']);
+        // Register frontend assets; enqueue from shortcode renderers only
+        add_action('init', [$this, 'register_frontend_assets']);
     }
     
     /**
      * Enqueue frontend assets
      */
-    public function enqueue_frontend_assets(): void {
-        wp_enqueue_style('flatpickr-style', 'https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css');
-        wp_enqueue_style('ycp-style', plugin_dir_url(__FILE__) . 'public/assets/style.css', [], self::VERSION);
-        
-        wp_enqueue_script('flatpickr', 'https://cdn.jsdelivr.net/npm/flatpickr', [], null, true);
-        wp_enqueue_script('ycp-script', plugin_dir_url(__FILE__) . 'public/assets/script.js', ['jquery', 'flatpickr'], self::VERSION, true);
-        wp_enqueue_script('ycp-availability-api', plugin_dir_url(__FILE__) . 'public/assets/availability-api.js', ['jquery'], self::VERSION, true);
+    public function register_frontend_assets(): void {
+        // Styles
+        wp_register_style('flatpickr-style', 'https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css', [], null);
+        wp_register_style('ycp-style', plugin_dir_url(__FILE__) . 'public/assets/style.css', [], self::VERSION);
+
+        // Scripts
+        wp_register_script('flatpickr', 'https://cdn.jsdelivr.net/npm/flatpickr', [], null, true);
+        wp_register_script('ycp-script', plugin_dir_url(__FILE__) . 'public/assets/script.js', ['jquery', 'flatpickr'], self::VERSION, true);
+        wp_register_script('ycp-availability-api', plugin_dir_url(__FILE__) . 'public/assets/availability-api.js', ['jquery'], self::VERSION, true);
 
         // Localize scripts with AJAX data
         $ajax_data = [
@@ -158,7 +160,7 @@ class Availability_Calendar_Plugin {
             'rest_url' => rest_url(),
             'nonce' => wp_create_nonce('ycp_availability_data_nonce')
         ];
-        
+
         wp_localize_script('ycp-script', 'ycp_ajax', $ajax_data);
         wp_localize_script('ycp-availability-api', 'ycp_ajax', $ajax_data);
     }
@@ -166,3 +168,17 @@ class Availability_Calendar_Plugin {
 
 // Initialize the plugin
 Availability_Calendar_Plugin::get_instance();
+
+// Activation hook: ensure DB schema exists and up to date
+register_activation_hook(__FILE__, function() {
+    if (class_exists('YCP_Professional_Manager')) {
+        YCP_Professional_Manager::create_table();
+        update_option('ycp_db_version', Availability_Calendar_Plugin::VERSION);
+    } else {
+        require_once plugin_dir_path(__FILE__) . 'includes/class-professional-manager.php';
+        if (class_exists('YCP_Professional_Manager')) {
+            YCP_Professional_Manager::create_table();
+            update_option('ycp_db_version', Availability_Calendar_Plugin::VERSION);
+        }
+    }
+});

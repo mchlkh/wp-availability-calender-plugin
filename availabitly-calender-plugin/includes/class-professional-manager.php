@@ -42,7 +42,6 @@ class YCP_Professional_Manager {
      */
     public function __construct() {
         $this->init_hooks();
-        $this->create_table();
     }
     
     /**
@@ -64,7 +63,7 @@ class YCP_Professional_Manager {
     /**
      * Create database table for professionals
      */
-    private function create_table(): void {
+    public static function create_table(): void {
         global $wpdb;
         
         $table_name = $wpdb->prefix . self::TABLE_NAME;
@@ -201,80 +200,6 @@ class YCP_Professional_Manager {
             </div>
         </div>
         
-        <style>
-        .ycp-admin-container {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
-            margin-top: 20px;
-        }
-        
-        .ycp-form-section, .ycp-list-section {
-            background: #fff;
-            padding: 20px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        
-        .ycp-professional-item {
-            border: 1px solid #ddd;
-            padding: 15px;
-            margin-bottom: 10px;
-            border-radius: 4px;
-            background: #f9f9f9;
-        }
-        
-        .ycp-professional-item h3 {
-            margin: 0 0 10px 0;
-        }
-        
-        .ycp-professional-id {
-            color: #0073aa;
-            font-weight: normal;
-            font-size: 0.9em;
-            background: #e7f3ff;
-            padding: 2px 6px;
-            border-radius: 3px;
-            margin-left: 8px;
-            border: 1px solid #b3d9ff;
-        }
-        
-        .ycp-professional-actions {
-            margin-top: 10px;
-        }
-        
-        .ycp-professional-actions .button {
-            margin-right: 5px;
-        }
-        
-        .ycp-image-preview {
-            max-width: 100px;
-            max-height: 100px;
-            margin-top: 10px;
-        }
-        
-        .ycp-info-box {
-            background: #f0f8ff;
-            border: 1px solid #b3d9ff;
-            border-radius: 4px;
-            padding: 15px;
-            margin-bottom: 20px;
-        }
-        
-        .ycp-info-box p {
-            margin: 0 0 10px 0;
-        }
-        
-        .ycp-info-box code {
-            background: #fff;
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 3px;
-            font-family: 'Courier New', monospace;
-            display: block;
-            margin-top: 5px;
-        }
-        </style>
         <?php
     }
     
@@ -330,6 +255,14 @@ class YCP_Professional_Manager {
         if ($hook !== 'toplevel_page_ycp-professionals') {
             return;
         }
+        
+        // Admin styles
+        wp_enqueue_style(
+            'ycp-admin-style',
+            plugin_dir_url(dirname(__FILE__)) . 'admin/admin.css',
+            [],
+            '1.0.0'
+        );
         
         // Enqueue Flatpickr for date selection
         wp_enqueue_script(

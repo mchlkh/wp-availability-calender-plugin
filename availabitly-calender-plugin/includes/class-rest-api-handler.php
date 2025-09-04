@@ -68,16 +68,15 @@ class YCP_REST_API_Handler {
                         'validate_callback' => [$this, 'validate_professional_id'],
                         'sanitize_callback' => 'absint'
                     ],
-                    'date' => [
+                    'date_from' => [
                         'required' => false,
                         'validate_callback' => [$this, 'validate_date'],
                         'sanitize_callback' => 'sanitize_text_field'
                     ],
-                    'limit' => [
+                    'date_to' => [
                         'required' => false,
-                        'validate_callback' => [$this, 'validate_limit'],
-                        'sanitize_callback' => 'absint',
-                        'default' => 100
+                        'validate_callback' => [$this, 'validate_date'],
+                        'sanitize_callback' => 'sanitize_text_field'
                     ]
                 ]
             ]
@@ -105,6 +104,16 @@ class YCP_REST_API_Handler {
                         'required' => false,
                         'validate_callback' => [$this, 'validate_professional_id'],
                         'sanitize_callback' => 'absint'
+                    ],
+                    'date_from' => [
+                        'required' => false,
+                        'validate_callback' => [$this, 'validate_date'],
+                        'sanitize_callback' => 'sanitize_text_field'
+                    ],
+                    'date_to' => [
+                        'required' => false,
+                        'validate_callback' => [$this, 'validate_date'],
+                        'sanitize_callback' => 'sanitize_text_field'
                     ]
                 ]
             ]
@@ -163,7 +172,13 @@ class YCP_REST_API_Handler {
      */
     public function validate_professional_id($param, $request, $key): bool {
         $professional_id = absint($param);
-        return $professional_id > 0 && get_post($professional_id) !== null;
+        if ($professional_id <= 0) {
+            return false;
+        }
+        global $wpdb;
+        $table = $wpdb->prefix . 'ycp_professionals';
+        $exists = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(1) FROM $table WHERE id = %d", $professional_id));
+        return $exists > 0;
     }
     
     /**
@@ -199,10 +214,10 @@ class YCP_REST_API_Handler {
     public function get_availability(WP_REST_Request $request): WP_REST_Response {
         try {
             $professional_id = $request->get_param('professional_id');
-            $date = $request->get_param('date');
-            $limit = $request->get_param('limit');
+            $date_from = (string) $request->get_param('date_from');
+            $date_to = (string) $request->get_param('date_to');
             
-            $data = $this->data_handler->get_professional_availability($professional_id, $date, $limit);
+            $data = $this->data_handler->get_professional_availability((int) $professional_id, $date_from, $date_to);
             
             return new WP_REST_Response($data, 200);
         } catch (Exception $e) {
@@ -218,14 +233,18 @@ class YCP_REST_API_Handler {
      */
     public function get_all_availability(WP_REST_Request $request): WP_REST_Response {
         try {
-            $date = $request->get_param('date');
-            $limit = $request->get_param('limit');
-            $professional_id = $request->get_param('professional_id');
+            $date = (string) $request->get_param('date');
+            $limit = (int) $request->get_param('limit');
+            $professional_id = (int) $request->get_param('professional_id');
+            $date_from = (string) $request->get_param('date_from');
+            $date_to = (string) $request->get_param('date_to');
             
-            if ($professional_id) {
-                $data = $this->data_handler->get_professional_availability($professional_id, $date, $limit);
+            if ($professional_id > 0) {
+                $data = $this->data_handler->get_professional_availability($professional_id, $date_from, $date_to);
+            } else if (!empty($date)) {
+                $data = $this->data_handler->get_availability_by_date($date, $limit ?: 100);
             } else {
-                $data = $this->data_handler->get_all_professionals_availability($limit);
+                $data = $this->data_handler->get_all_professionals_availability($limit ?: 100);
             }
             
             return new WP_REST_Response($data, 200);

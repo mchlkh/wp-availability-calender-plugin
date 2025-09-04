@@ -1,5 +1,71 @@
 /* Admin Settings Page Styles for Availability Calendar Plugin */
 
+/* Professionals admin screen layout previously inlined */
+.ycp-admin-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+    margin-top: 20px;
+}
+
+.ycp-form-section, .ycp-list-section {
+    background: #fff;
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.ycp-professional-item {
+    border: 1px solid #ddd;
+    padding: 15px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+    background: #f9f9f9;
+}
+
+.ycp-professional-item h3 {
+    margin: 0 0 10px 0;
+}
+
+.ycp-professional-id {
+    color: #0073aa;
+    font-weight: normal;
+    font-size: 0.9em;
+    background: #e7f3ff;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: 8px;
+    border: 1px solid #b3d9ff;
+}
+
+.ycp-professional-actions { margin-top: 10px; }
+.ycp-professional-actions .button { margin-right: 5px; }
+
+.ycp-image-preview {
+    max-width: 100px;
+    max-height: 100px;
+    margin-top: 10px;
+}
+
+.ycp-info-box {
+    background: #f0f8ff;
+    border: 1px solid #b3d9ff;
+    border-radius: 4px;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+.ycp-info-box p { margin: 0 0 10px 0; }
+.ycp-info-box code {
+    background: #fff;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    display: block;
+    margin-top: 5px;
+}
+
 /* Main settings container */
 .wrap.ycp-admin-settings {
     max-width: 1200px;
