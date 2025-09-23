@@ -189,6 +189,11 @@ class YCP_Display_Handler {
      * Render a professional card
      */
     public function render_professional_card(array $professional): string {
+        $room = isset($professional['room']) ? trim((string) $professional['room']) : '';
+        $floor = isset($professional['floor']) ? trim((string) $professional['floor']) : '';
+        // Show location bar only if a floor is provided. If only room is provided or both empty, hide it.
+        $hasLocation = ($floor !== '');
+
         $output = '<div class="ycp-pro">';
         
         // Check if URL exists and is not empty
@@ -215,11 +220,28 @@ class YCP_Display_Handler {
         
         $output .= "</div>"; // Close text-overlay
         $output .= "</div>"; // Close image-container
-        
+
+        // Close outer link BEFORE rendering location bar to avoid nested anchors
         if (!empty($professional['url'])) {
             $output .= "</a>";
         }
-        
+
+        // Sticky bottom bar inside the card container, but outside the hover overlay
+        $locationText = '';
+        if ($hasLocation) {
+            $floorUrl = isset($professional['floor_url']) ? esc_url($professional['floor_url']) : '';
+            $floorHtml = $floorUrl ? '<a href="' . $floorUrl . '">' . esc_html($floor) . '</a>' : esc_html($floor);
+            if ($room !== '') {
+                $locationText = sprintf(__('Am ausgewählten Tag im %s, %s', self::TEXT_DOMAIN), $floorHtml, esc_html($room));
+            } else {
+                // Room empty: show only floor without comma
+                $locationText = sprintf(__('Am ausgewählten Tag im %s', self::TEXT_DOMAIN), $floorHtml);
+            }
+            if ($locationText !== '') {
+                $output .= '<div class="ycp-location-bar">' . $locationText . '</div>';
+            }
+        }
+
         $output .= '</div>'; // Close ycp-pro
         
         return $output;

@@ -1084,6 +1084,31 @@ html, body {
     background: linear-gradient(to top, rgba(0,0,0,0.8), rgba(0,0,0,0.4) 60%, transparent);
 }
 
+/* Sticky location bar under each card (not part of hover area) */
+.ycp-location-bar {
+    background: #143931;
+    color: #ffffff;
+    font-family: 'DM Sans', Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.4;
+    padding: 10px 12px;
+    text-align: center;
+    white-space: normal; /* prefer one line, wrap only if needed */
+    overflow-wrap: anywhere; /* allow break when too long */
+}
+
+.ycp-location-bar a {
+    color: #ffffff;
+    text-decoration: underline;
+    font-weight: 600;
+    display: inline; /* override .ycp-pro a { display:block } */
+}
+
+.ycp-location-bar a:hover,
+.ycp-location-bar a:focus {
+    opacity: 0.9;
+}
+
 /* Compact Availability Display Styles */
 .ycp-availability-compact {
     font-family: Arial, sans-serif;

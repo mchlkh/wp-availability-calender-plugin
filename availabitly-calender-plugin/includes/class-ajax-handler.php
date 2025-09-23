@@ -75,6 +75,23 @@ class YCP_Ajax_Handler {
         try {
             $date = $this->validate_date_parameter();
             $professionals = $this->professional_manager->get_professionals_for_date($date);
+            // Enrich with room/floor and floor_url for the selected day
+            require_once plugin_dir_path(__FILE__) . 'class-availability-repository.php';
+            $repo = new YCP_Availability_Repository();
+            global $wpdb;
+            $floors_table = $wpdb->prefix . 'ycp_floors';
+            foreach ($professionals as &$pro) {
+                $details = $repo->get_day_details((int) $pro['id'], $date);
+                $pro['room'] = $details['room'];
+                $pro['floor'] = $details['floor'];
+                $floor_name = isset($details['floor']) ? trim((string) $details['floor']) : '';
+                $floor_url = '';
+                if ($floor_name !== '') {
+                    $floor_url = (string) $wpdb->get_var($wpdb->prepare("SELECT url FROM $floors_table WHERE name = %s LIMIT 1", $floor_name));
+                }
+                $pro['floor_url'] = $floor_url;
+            }
+            unset($pro);
             $found_professionals = !empty($professionals);
             
             // Render available professionals for selected date
@@ -85,7 +102,17 @@ class YCP_Ajax_Handler {
             $all_professionals_raw = $this->professional_manager->get_all_professionals();
             $all_professionals_formatted = [];
             foreach ($all_professionals_raw as $professional_raw) {
-                $all_professionals_formatted[] = $this->professional_manager->format_professional_for_frontend($professional_raw);
+                $formatted = $this->professional_manager->format_professional_for_frontend($professional_raw);
+                $details = $repo->get_day_details((int) $formatted['id'], $date);
+                $formatted['room'] = $details['room'];
+                $formatted['floor'] = $details['floor'];
+                $floor_name = isset($details['floor']) ? trim((string) $details['floor']) : '';
+                $floor_url = '';
+                if ($floor_name !== '') {
+                    $floor_url = (string) $wpdb->get_var($wpdb->prepare("SELECT url FROM $floors_table WHERE name = %s LIMIT 1", $floor_name));
+                }
+                $formatted['floor_url'] = $floor_url;
+                $all_professionals_formatted[] = $formatted;
             }
 
             // For the Royal Crew section we want to show the full ordered list again,

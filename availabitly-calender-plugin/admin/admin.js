@@ -72,6 +72,8 @@ document.addEventListener('DOMContentLoaded', function () {
         // Initialize date picker
         if (dateInput) {
             initDatePicker(dateInput);
+            initDayDetails(dateInput);
+            preloadLocations();
         }
         
         // Initialize image upload
@@ -121,6 +123,162 @@ document.addEventListener('DOMContentLoaded', function () {
                 dateInput.value = dateStr;
             }
         });
+    }
+
+    /**
+     * Initialize per-day room/floor details handlers
+     */
+    function initDayDetails(dateInput) {
+        const dayDateInput = document.getElementById('ycp_day_details_date');
+        const roomInput = document.getElementById('ycp_day_room');
+        const floorInput = document.getElementById('ycp_day_floor');
+        const loadBtn = document.getElementById('ycp_load_day_details');
+        const saveBtn = document.getElementById('ycp_save_day_details');
+
+        if (!dayDateInput || !roomInput || !floorInput || !loadBtn || !saveBtn) return;
+
+        // Default day input mirrors last selected date
+        if (dateInput && dateInput._flatpickr) {
+            dateInput._flatpickr.config.onChange.push(function(selectedDates, dateStr) {
+                const parts = dateStr.split(',').map(s => s.trim()).filter(Boolean);
+                if (parts.length > 0) {
+                    dayDateInput.value = parts[parts.length - 1];
+                }
+            });
+        }
+
+        loadBtn.addEventListener('click', function() {
+            const professionalId = document.getElementById('ycp_professional_id').value || '0';
+            const date = (dayDateInput.value || '').trim();
+            if (!professionalId || !date) {
+                showMessage('Please select a professional and date.', 'error');
+                return;
+            }
+            const formData = new FormData();
+            formData.append('action', 'ycp_get_day_details');
+            formData.append('nonce', ycp_ajax.nonce);
+            formData.append('professional_id', professionalId);
+            formData.append('date', date);
+            fetch(ycp_ajax.ajax_url, { method: 'POST', body: formData })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        // Try to select matching option by text; fallback leave as-is
+                        selectByText(floorInput, data.data.floor || '');
+                        selectByText(roomInput, data.data.room || '');
+                        showMessage('Day details loaded.', 'info');
+                    } else {
+                        showMessage(data.data && data.data.message ? data.data.message : 'Failed to load day details.', 'error');
+                    }
+                })
+                .catch(() => showMessage('Request failed while loading day details.', 'error'));
+        });
+
+        saveBtn.addEventListener('click', function() {
+            const professionalId = document.getElementById('ycp_professional_id').value || '0';
+            const date = (dayDateInput.value || '').trim();
+            const room = getSelectedText(roomInput);
+            const floor = getSelectedText(floorInput);
+            if (!professionalId || !date) {
+                showMessage('Please select a professional and date.', 'error');
+                return;
+            }
+            const formData = new FormData();
+            formData.append('action', 'ycp_save_day_details');
+            formData.append('nonce', ycp_ajax.nonce);
+            formData.append('professional_id', professionalId);
+            formData.append('date', date);
+            formData.append('room', room);
+            formData.append('floor', floor);
+            fetch(ycp_ajax.ajax_url, { method: 'POST', body: formData })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        // Ensure date is included in the multi-date field
+                        const values = (dateInput.value || '').split(',').map(s => s.trim()).filter(Boolean);
+                        if (!values.includes(date)) {
+                            values.push(date);
+                            values.sort();
+                            dateInput.value = values.join(',');
+                            if (dateInput._flatpickr) {
+                                dateInput._flatpickr.setDate(values);
+                            }
+                        }
+                        showMessage('Day details saved.', 'success');
+                    } else {
+                        showMessage(data.data && data.data.message ? data.data.message : 'Failed to save day details.', 'error');
+                    }
+                })
+                .catch(() => showMessage('Request failed while saving day details.', 'error'));
+        });
+    }
+
+    function preloadLocations() {
+        const formData = new FormData();
+        formData.append('action', 'ycp_get_locations');
+        formData.append('nonce', ycp_ajax.nonce);
+        fetch(ycp_ajax.ajax_url, { method: 'POST', body: formData })
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) return;
+                const floorSel = document.getElementById('ycp_day_floor');
+                const roomSel = document.getElementById('ycp_day_room');
+                if (floorSel) {
+                    floorSel.innerHTML = '';
+                    const optEmpty = document.createElement('option');
+                    optEmpty.value = '';
+                    optEmpty.textContent = '— No Floor —';
+                    floorSel.appendChild(optEmpty);
+                    data.data.floors.forEach(f => {
+                        const o = document.createElement('option');
+                        o.value = String(f.id);
+                        o.textContent = f.name;
+                        floorSel.appendChild(o);
+                    });
+                }
+                if (roomSel) {
+                    roomSel.innerHTML = '';
+                    const optEmpty = document.createElement('option');
+                    optEmpty.value = '';
+                    optEmpty.textContent = '— No Room —';
+                    roomSel.appendChild(optEmpty);
+                    data.data.rooms.forEach(rm => {
+                        const o = document.createElement('option');
+                        o.value = String(rm.id);
+                        o.textContent = rm.name;
+                        roomSel.appendChild(o);
+                    });
+                }
+            })
+            .catch(() => {});
+    }
+
+    function selectByText(selectEl, text) {
+        if (!selectEl) return;
+        const t = String(text).trim();
+        let matched = false;
+        for (let i = 0; i < selectEl.options.length; i++) {
+            if (selectEl.options[i].text.trim() === t) {
+                selectEl.selectedIndex = i;
+                matched = true;
+                break;
+            }
+        }
+        if (!matched) {
+            selectEl.selectedIndex = 0;
+        }
+    }
+
+    function getSelectedText(selectEl) {
+        if (!selectEl) return '';
+        const opt = selectEl.options[selectEl.selectedIndex];
+        if (!opt) return '';
+        // If the selected option has an empty value, treat it as no selection
+        const value = (opt.value || '').trim();
+        if (value === '') {
+            return '';
+        }
+        return opt.text.trim();
     }
     
     /**

@@ -58,6 +58,9 @@ class YCP_Professional_Manager {
         add_action('wp_ajax_ycp_save_professional', [$this, 'ajax_save_professional']);
         add_action('wp_ajax_ycp_delete_professional', [$this, 'ajax_delete_professional']);
         add_action('wp_ajax_ycp_get_professional', [$this, 'ajax_get_professional']);
+        add_action('wp_ajax_ycp_get_day_details', [$this, 'ajax_get_day_details']);
+        add_action('wp_ajax_ycp_save_day_details', [$this, 'ajax_save_day_details']);
+        add_action('wp_ajax_ycp_get_locations', [$this, 'ajax_get_locations']);
     }
     
     /**
@@ -162,6 +165,22 @@ class YCP_Professional_Manager {
                                 <td>
                                     <input type="text" id="ycp_available_dates" name="available_dates" class="regular-text" readonly>
                                     <p class="description"><?php esc_html_e('Click to select dates', self::TEXT_DOMAIN); ?></p>
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <th scope="row">
+                                    <label for="ycp_day_details_date"><?php esc_html_e('Per-Day Details:', self::TEXT_DOMAIN); ?></label>
+                                </th>
+                                <td>
+                                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                                        <input type="text" id="ycp_day_details_date" class="regular-text" placeholder="YYYY-MM-DD" style="max-width:200px;" />
+                                        <select id="ycp_day_floor" style="max-width:220px; min-width:200px;"></select>
+                                        <select id="ycp_day_room" style="max-width:220px; min-width:200px;"></select>
+                                        <button type="button" id="ycp_load_day_details" class="button"><?php esc_html_e('Load', self::TEXT_DOMAIN); ?></button>
+                                        <button type="button" id="ycp_save_day_details" class="button button-primary"><?php esc_html_e('Save Day Details', self::TEXT_DOMAIN); ?></button>
+                                    </div>
+                                    <p class="description"><?php esc_html_e('Pick a date and set room and floor for that specific day. Lists are sourced from Rooms & Floors.', self::TEXT_DOMAIN); ?></p>
                                 </td>
                             </tr>
 
@@ -338,14 +357,23 @@ class YCP_Professional_Manager {
             $result = $this->create_professional($data);
         }
         
-        if ($result) {
-            wp_send_json_success([
-                'message' => __('Professional saved successfully.', self::TEXT_DOMAIN),
-                'professionals' => $this->get_all_professionals()
-            ]);
-        } else {
+        if (!$result) {
             wp_send_json_error(['message' => __('Failed to save professional.', self::TEXT_DOMAIN)]);
         }
+
+        // Sync selected dates to per-day availability table
+        require_once plugin_dir_path(__FILE__) . 'class-availability-repository.php';
+        $repo = new YCP_Availability_Repository();
+        $dates = $this->parse_dates_string($available_dates);
+        $target_id = $professional_id > 0 ? $professional_id : $this->get_last_insert_id();
+        if ($target_id > 0) {
+            $repo->sync_dates($target_id, $dates);
+        }
+
+        wp_send_json_success([
+            'message' => __('Professional saved successfully.', self::TEXT_DOMAIN),
+            'professionals' => $this->get_all_professionals()
+        ]);
     }
     
     /**
@@ -408,6 +436,79 @@ class YCP_Professional_Manager {
             wp_send_json_error(['message' => __('Professional not found.', self::TEXT_DOMAIN)]);
         }
     }
+
+    /**
+     * AJAX: Get room/floor for a specific day
+     */
+    public function ajax_get_day_details(): void {
+        if (!wp_verify_nonce($_POST['nonce'], self::NONCE_ACTION)) {
+            wp_send_json_error(['message' => __('Security check failed.', self::TEXT_DOMAIN)]);
+        }
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => __('Insufficient permissions.', self::TEXT_DOMAIN)]);
+        }
+        $professional_id = intval($_POST['professional_id'] ?? 0);
+        $date = sanitize_text_field($_POST['date'] ?? '');
+        if ($professional_id <= 0 || empty($date)) {
+            wp_send_json_error(['message' => __('Invalid input.', self::TEXT_DOMAIN)]);
+        }
+
+        require_once plugin_dir_path(__FILE__) . 'class-availability-repository.php';
+        $repo = new YCP_Availability_Repository();
+        $details = $repo->get_day_details($professional_id, $date);
+        wp_send_json_success($details);
+    }
+
+    /**
+     * AJAX: Save room/floor for a specific day (upsert)
+     */
+    public function ajax_save_day_details(): void {
+        if (!wp_verify_nonce($_POST['nonce'], self::NONCE_ACTION)) {
+            wp_send_json_error(['message' => __('Security check failed.', self::TEXT_DOMAIN)]);
+        }
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => __('Insufficient permissions.', self::TEXT_DOMAIN)]);
+        }
+        $professional_id = intval($_POST['professional_id'] ?? 0);
+        $date = sanitize_text_field($_POST['date'] ?? '');
+        $room = isset($_POST['room']) ? sanitize_text_field($_POST['room']) : null;
+        $floor = isset($_POST['floor']) ? sanitize_text_field($_POST['floor']) : null;
+        // Normalize empty strings to null to represent "no selection"
+        if ($room !== null) {
+            $room = trim((string) $room);
+            if ($room === '') { $room = null; }
+        }
+        if ($floor !== null) {
+            $floor = trim((string) $floor);
+            if ($floor === '') { $floor = null; }
+        }
+        if ($professional_id <= 0 || empty($date)) {
+            wp_send_json_error(['message' => __('Invalid input.', self::TEXT_DOMAIN)]);
+        }
+
+        require_once plugin_dir_path(__FILE__) . 'class-availability-repository.php';
+        $repo = new YCP_Availability_Repository();
+        $repo->upsert_availability($professional_id, $date, $room, $floor);
+        wp_send_json_success(['message' => __('Day details saved.', self::TEXT_DOMAIN)]);
+    }
+
+    /**
+     * AJAX: Get floors and rooms lists for dropdowns
+     */
+    public function ajax_get_locations(): void {
+        if (!wp_verify_nonce($_POST['nonce'], self::NONCE_ACTION)) {
+            wp_send_json_error(['message' => __('Security check failed.', self::TEXT_DOMAIN)]);
+        }
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => __('Insufficient permissions.', self::TEXT_DOMAIN)]);
+        }
+        global $wpdb;
+        $floors_table = $wpdb->prefix . 'ycp_floors';
+        $rooms_table = $wpdb->prefix . 'ycp_rooms';
+        $floors = $wpdb->get_results("SELECT id, name, url FROM $floors_table ORDER BY name ASC", ARRAY_A) ?: [];
+        $rooms = $wpdb->get_results("SELECT id, name FROM $rooms_table ORDER BY name ASC", ARRAY_A) ?: [];
+        wp_send_json_success(['floors' => $floors, 'rooms' => $rooms]);
+    }
     
     /**
      * Create a new professional
@@ -424,6 +525,14 @@ class YCP_Professional_Manager {
         );
         
         return $result !== false;
+    }
+
+    /**
+     * Get last insert id from wpdb
+     */
+    private function get_last_insert_id(): int {
+        global $wpdb;
+        return (int) $wpdb->insert_id;
     }
     
     /**

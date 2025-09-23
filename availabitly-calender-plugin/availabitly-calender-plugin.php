@@ -118,6 +118,10 @@ class Availability_Calendar_Plugin {
         require_once plugin_dir_path(__FILE__) . 'includes/overview-ui.php';
         require_once plugin_dir_path(__FILE__) . 'includes/class-settings-manager.php';
         require_once plugin_dir_path(__FILE__) . 'includes/class-rest-api-handler.php';
+        require_once plugin_dir_path(__FILE__) . 'includes/class-availability-repository.php';
+        require_once plugin_dir_path(__FILE__) . 'includes/class-import-manager.php';
+        require_once plugin_dir_path(__FILE__) . 'includes/class-export-manager.php';
+        require_once plugin_dir_path(__FILE__) . 'includes/class-location-manager.php';
     }
     
     /**
@@ -131,6 +135,12 @@ class Availability_Calendar_Plugin {
         $this->ajax_handler = new YCP_Ajax_Handler($this->professional_manager, $this->data_handler, $this->display_handler);
         $this->settings_manager = new YCP_Settings_Manager();
         $this->rest_api_handler = new YCP_REST_API_Handler($this->data_handler);
+        // Initialize import manager (registers admin submenu and handlers)
+        new YCP_Import_Manager(new YCP_Availability_Repository());
+        // Initialize export manager
+        new YCP_Export_Manager();
+        // Initialize Rooms & Floors manager
+        new YCP_Location_Manager();
     }
     
     /**
@@ -179,6 +189,22 @@ register_activation_hook(__FILE__, function() {
         if (class_exists('YCP_Professional_Manager')) {
             YCP_Professional_Manager::create_table();
             update_option('ycp_db_version', Availability_Calendar_Plugin::VERSION);
+        }
+    }
+    if (class_exists('YCP_Availability_Repository')) {
+        YCP_Availability_Repository::create_table();
+    } else {
+        require_once plugin_dir_path(__FILE__) . 'includes/class-availability-repository.php';
+        if (class_exists('YCP_Availability_Repository')) {
+            YCP_Availability_Repository::create_table();
+        }
+    }
+    if (class_exists('YCP_Location_Manager')) {
+        YCP_Location_Manager::create_tables();
+    } else {
+        require_once plugin_dir_path(__FILE__) . 'includes/class-location-manager.php';
+        if (class_exists('YCP_Location_Manager')) {
+            YCP_Location_Manager::create_tables();
         }
     }
 });

@@ -87,6 +87,21 @@ The Availability Calendar Plugin provides a complete solution for displaying pro
 [ycp_availability_overview view="summary"]
 ```
 
+## 📥 CSV Import (Admin)
+
+- Path: `Professionals` → `CSV Import`
+- CSV columns: `professional_id` (optional), `date` (Y-m-d), `room`, `floor`, `name`, `description`, `profile_url`, `image_url`, `display_order`
+- Behavior: For each professional in the file, base fields are replaced, per-day availability is fully replaced, and `available_dates` is regenerated for backward compatibility.
+
+Sample CSV:
+```csv
+professional_id,date,room,floor,name,description,profile_url,image_url,display_order
+1,2025-10-01,Room A,Level 2,Jane Doe,Cardiology profile,https://example.com/jane,https://example.com/jane.jpg,1
+1,2025-10-02,Room A,Level 2,Jane Doe,Cardiology profile,https://example.com/jane,https://example.com/jane.jpg,1
+,2025-10-03,Room B,B1,John Smith,Orthopedics,https://example.com/john,https://example.com/john.jpg,2
+3,2025-10-05,Suite 12,Mezzanine,Alex Kim,Dermatology,https://example.com/alex,https://example.com/alex.jpg,3
+```
+
 #### Option B: PHP Function
 ```php
 // In your theme template
