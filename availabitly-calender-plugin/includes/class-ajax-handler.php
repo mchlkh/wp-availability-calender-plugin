@@ -66,6 +66,7 @@ class YCP_Ajax_Handler {
         add_shortcode('ycp_calendar', [$this->display_handler, 'render_calendar_shortcode']);
         add_shortcode('ycp_today_simple', [$this->display_handler, 'render_today_simple_shortcode']);
         add_shortcode('ycp_availability_data', [$this->display_handler, 'render_availability_data_shortcode']);
+        add_shortcode('ycp_weekly_floor', [$this->display_handler, 'render_weekly_floor_shortcode']);
     }
     
     /**

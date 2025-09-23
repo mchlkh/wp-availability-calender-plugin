@@ -44,6 +44,123 @@ class YCP_Display_Handler {
         $this->professional_manager = $professional_manager;
         $this->data_handler = $data_handler;
     }
+
+    /**
+     * Render weekly-by-floor table view
+     *
+     * Shortcode: [ycp_weekly_floor floor_id="123" weeks="1"]
+     * - floor_id: required, references `ycp_floors.id`
+     * - weeks: number of consecutive weeks starting from current week (site timezone), default 1
+     */
+    public function render_weekly_floor_shortcode(array $atts = []): string {
+        if (function_exists('wp_enqueue_style')) {
+            wp_enqueue_style('ycp-style');
+        }
+
+        $atts = shortcode_atts([
+            'floor_id' => 0,
+            'weeks' => 1,
+        ], $atts, 'ycp_weekly_floor');
+
+        $floor_id = absint($atts['floor_id']);
+        $weeks = max(1, (int) $atts['weeks']);
+
+        if ($floor_id <= 0) {
+            return '<p class="ycp-error">' . esc_html__('Bitte eine gültige Stock-ID angeben.', self::TEXT_DOMAIN) . '</p>';
+        }
+
+        global $wpdb;
+        $floors_table = $wpdb->prefix . 'ycp_floors';
+        $floor_row = $wpdb->get_row($wpdb->prepare("SELECT name, url FROM $floors_table WHERE id = %d", $floor_id), ARRAY_A);
+        if (!$floor_row) {
+            return '<p class="ycp-error">' . esc_html__('Stock nicht gefunden.', self::TEXT_DOMAIN) . '</p>';
+        }
+        $floor_name = isset($floor_row['name']) ? (string) $floor_row['name'] : '';
+        $floor_url = isset($floor_row['url']) ? (string) $floor_row['url'] : '';
+
+        // Resolve current week based on site timezone
+        $tz = function_exists('wp_timezone') ? wp_timezone() : new \DateTimeZone(wp_timezone_string());
+        $now = new \DateTime('now', $tz);
+        $weekStart = (clone $now)->modify('monday this week')->setTime(0, 0, 0);
+
+        $output = '';
+
+        for ($w = 0; $w < $weeks; $w++) {
+            $start = (clone $weekStart)->modify("+{$w} week");
+            $end = (clone $start)->modify('+6 days');
+
+            // Query availability for this floor and date range
+            $availability_table = $wpdb->prefix . 'ycp_availability';
+            $professionals_table = $wpdb->prefix . 'ycp_professionals';
+            $sql = $wpdb->prepare(
+                "SELECT a.date, a.professional_id, a.room, p.name, p.display_order
+                 FROM $availability_table a
+                 INNER JOIN $professionals_table p ON p.id = a.professional_id
+                 WHERE a.floor = %s AND a.date BETWEEN %s AND %s
+                 ORDER BY p.display_order ASC, p.name ASC",
+                $floor_name,
+                $start->format('Y-m-d'),
+                $end->format('Y-m-d')
+            );
+            $rows = $wpdb->get_results($sql, ARRAY_A) ?: [];
+
+            // Build rows grouped by professional
+            $byPro = [];
+            foreach ($rows as $row) {
+                $proId = (int) $row['professional_id'];
+                if (!isset($byPro[$proId])) {
+                    $byPro[$proId] = [
+                        'name' => (string) $row['name'],
+                        // 1..7 => bool
+                        'days' => [1=>false,2=>false,3=>false,4=>false,5=>false,6=>false,7=>false],
+                    ];
+                }
+                $date = (string) $row['date'];
+                $dow = (int) (new \DateTime($date, $tz))->format('N');
+                $byPro[$proId]['days'][$dow] = true; // do not dedupe count; dot is presence
+            }
+
+            // Table header and caption
+            $header = sprintf(
+                /* translators: 1: floor name, 2: start date (d.m.), 3: end date (d.m.Y) */
+                esc_html__('Anwesend im %1$s in der Woche vom %2$s bis %3$s', self::TEXT_DOMAIN),
+                esc_html($floor_name),
+                esc_html(wp_date('d.m.', $start->getTimestamp(), $tz)),
+                esc_html(wp_date('d.m.Y', $end->getTimestamp(), $tz))
+            );
+
+            $output .= '<div class="ycp-weekly-floor">';
+            $output .= '<div class="ycp-calendar-header"><h3>' . $header . '</h3></div>';
+            $output .= '<table class="ycp-weekly-floor-table">';
+            $output .= '<thead><tr>'
+                . '<th>' . esc_html__('Lady', self::TEXT_DOMAIN) . '</th>'
+                . '<th>' . esc_html__('Mo', self::TEXT_DOMAIN) . '</th>'
+                . '<th>' . esc_html__('Di', self::TEXT_DOMAIN) . '</th>'
+                . '<th>' . esc_html__('Mi', self::TEXT_DOMAIN) . '</th>'
+                . '<th>' . esc_html__('Do', self::TEXT_DOMAIN) . '</th>'
+                . '<th>' . esc_html__('Fr', self::TEXT_DOMAIN) . '</th>'
+                . '<th>' . esc_html__('Sa', self::TEXT_DOMAIN) . '</th>'
+                . '<th>' . esc_html__('So', self::TEXT_DOMAIN) . '</th>'
+                . '</tr></thead>';
+
+            $output .= '<tbody>';
+            if (empty($byPro)) {
+                $output .= '<tr><td colspan="8" class="ycp-empty">' . esc_html__('Keine Einträge für diese Woche.', self::TEXT_DOMAIN) . '</td></tr>';
+            } else {
+                foreach ($byPro as $pro) {
+                    $output .= '<tr>';
+                    $output .= '<td class="ycp-col-name">' . esc_html($pro['name']) . '</td>';
+                    for ($d = 1; $d <= 7; $d++) {
+                        $output .= '<td class="ycp-col-day">' . ($pro['days'][$d] ? '<span class="ycp-dot" aria-hidden="true"></span>' : '') . '</td>';
+                    }
+                    $output .= '</tr>';
+                }
+            }
+            $output .= '</tbody></table></div>';
+        }
+
+        return $output;
+    }
     
     /**
      * Render calendar shortcode

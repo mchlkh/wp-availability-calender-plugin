@@ -1110,6 +1110,50 @@ html, body {
     opacity: 0.9;
 }
 
+/* Weekly floor table (minimal) */
+.ycp-weekly-floor {
+    margin: 24px auto;
+    width: 100%;
+    max-width: 1200px; /* default; can be overridden by layout breakout below */
+    padding-left: 0;
+    padding-right: 0;
+    box-sizing: border-box;
+}
+.ycp-weekly-floor-table { width: 100%; margin: 0 auto; border-collapse: collapse; }
+
+/* Break out of WP block editor constrained layout when present to match calendar width */
+.is-layout-constrained .ycp-weekly-floor {
+    max-width: 1000px !important;
+    width: 95vw;
+    margin-left: calc(-47.5vw + 50%);
+    margin-right: 0;
+    padding-left: 2.5%;
+    padding-right: 2.5%;
+}
+.ycp-weekly-floor-table th,
+.ycp-weekly-floor-table td { padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.15); text-align: center; }
+.ycp-weekly-floor-table th:first-child,
+.ycp-weekly-floor-table td:first-child { text-align: left; width: 32%; }
+.ycp-weekly-floor-table thead th { background: rgba(255,255,255,0.06); font-weight: 600; }
+.ycp-weekly-floor-table .ycp-empty { text-align: center; opacity: 0.85; }
+.ycp-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: currentColor; opacity: 0.9; }
+
+/* Mobile optimizations: keep weekday headers on one line and preserve dots visibility */
+@media (max-width: 480px) {
+    .ycp-weekly-floor-table { table-layout: fixed; }
+    .ycp-weekly-floor-table th, .ycp-weekly-floor-table td { padding: 6px 4px; white-space: nowrap; }
+    .ycp-weekly-floor-table th:first-child, .ycp-weekly-floor-table td:first-child { width: 45%; }
+    .ycp-weekly-floor-table th:not(:first-child), .ycp-weekly-floor-table td:not(:first-child) { width: calc(55% / 7); min-width: 36px; text-align: center; }
+    .ycp-col-name { overflow: hidden; text-overflow: ellipsis; }
+    .ycp-dot { width: 8px; height: 8px; }
+}
+
+/* Force weekly floor table to use white text and white lines */
+.ycp-weekly-floor-table { color: #ffffff !important; }
+.ycp-weekly-floor-table th,
+.ycp-weekly-floor-table td { color: #ffffff !important; border: 1px solid rgba(255,255,255,0.5) !important; }
+.ycp-weekly-floor-table thead th { background: rgba(255,255,255,0.06) !important; }
+
 /* Compact Availability Display Styles */
 .ycp-availability-compact {
     font-family: Arial, sans-serif;

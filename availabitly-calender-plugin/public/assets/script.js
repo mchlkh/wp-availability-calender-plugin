@@ -96,7 +96,9 @@ document.addEventListener('DOMContentLoaded', function () {
         
         attempts.forEach(delay => {
             setTimeout(() => {
-                const headerTitle = document.querySelector('.ycp-calendar-header h3');
+                // Scope to the main calendar container only to avoid touching other views
+                const container = document.getElementById('ycp-calendar-container');
+                const headerTitle = container ? container.querySelector('.ycp-calendar-header h3') : null;
                 
                 if (headerTitle && headerTitle.textContent === 'Heute anwesend') {
                     headerTitle.textContent = 'Die gesamte Royal Crew';
@@ -105,7 +107,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 } else {
                     // console.log(`Header element not found after ${delay}ms - trying alternative selectors`);
                     // Try alternative selectors
-                    const altHeader1 = document.querySelector('h3');
+                    const altHeader1 = container ? container.querySelector('h3') : null;
                     if (altHeader1 && altHeader1.textContent === 'Heute anwesend') {
                         altHeader1.textContent = 'Die gesamte Royal Crew';
                     }
@@ -400,7 +402,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     
                     // Check if professionals are available for the selected date
                     const availabilityData = resultsContainer.querySelector('.ycp-availability-data');
-                    const headerTitle = document.querySelector('.ycp-calendar-header h3');
+                    const container = document.getElementById('ycp-calendar-container');
+                    const headerTitle = container ? container.querySelector('.ycp-calendar-header h3') : null;
                     
                     if (availabilityData && headerTitle) {
                         const isAvailable = availabilityData.getAttribute('data-available') === 'true';

@@ -7,3 +7,9 @@ When integrating the availabilite dates use:
     css_class="ycp-availability-compact modern"]
 
 the id can be found in the URL when clicking on the professional
+
+
+integrate the table view 
+
+[ycp_weekly_floor floor_id="3" weeks="2"] 
+
