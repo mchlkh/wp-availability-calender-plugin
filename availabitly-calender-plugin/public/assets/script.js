@@ -186,14 +186,13 @@ document.addEventListener('DOMContentLoaded', function () {
         if (lastRowCount === 0) lastRowCount = Math.min(columnCount, visibleCount);
         const lastRowStartIndex = Math.max(0, visibleCount - lastRowCount);
         cards.forEach((card, index) => {
-            const imageContainer = card.querySelector('.image-container');
-            if (!imageContainer) return;
-            let cardFade = imageContainer.querySelector('.ycp-card-fade');
-            if (index >= lastRowStartIndex) {
+            let cardFade = card.querySelector('.ycp-card-fade');
+            // Only add fade to cards in the last visible row within the preview window
+            if (index >= lastRowStartIndex && index < visibleCount) {
                 if (!cardFade) {
                     cardFade = document.createElement('div');
                     cardFade.className = 'ycp-card-fade';
-                    imageContainer.appendChild(cardFade);
+                    card.appendChild(cardFade);
                 }
             } else if (cardFade) {
                 cardFade.remove();
@@ -224,8 +223,7 @@ document.addEventListener('DOMContentLoaded', function () {
         btn.addEventListener('click', () => {
             cards.forEach(card => {
                 card.classList.remove('ycp-pro-hidden');
-                const imageContainer = card.querySelector('.image-container');
-                const cardFade = imageContainer ? imageContainer.querySelector('.ycp-card-fade') : null;
+                const cardFade = card.querySelector('.ycp-card-fade');
                 if (cardFade) cardFade.remove();
             });
             showMoreContainer.remove();
