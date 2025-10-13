@@ -372,6 +372,46 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
     
+    // Weekly floor: reveal hidden weeks in chunks of three per click, per instance
+    function initWeeklyFloorShowMore() {
+        const wrappers = document.querySelectorAll('.ycp-weekly-floor-wrapper');
+        wrappers.forEach(wrapper => {
+            const totalWeeks = parseInt(wrapper.getAttribute('data-total-weeks') || '0', 10);
+            const initialVisible = parseInt(wrapper.getAttribute('data-initial-visible') || '0', 10);
+            const blocks = Array.from(wrapper.querySelectorAll('.ycp-week-block'));
+            const showMore = wrapper.querySelector('.ycp-weekly-show-more .ycp-show-all-button');
+            if (!showMore) return;
+
+            // Hide button if not needed (defense-in-depth)
+            if (totalWeeks <= initialVisible) {
+                const container = wrapper.querySelector('.ycp-weekly-show-more');
+                if (container) container.remove();
+                return;
+            }
+
+            showMore.addEventListener('click', () => {
+                // Reveal up to 3 hidden blocks per click
+                let revealed = 0;
+                for (let i = 0; i < blocks.length && revealed < 3; i++) {
+                    const block = blocks[i];
+                    if (block.classList.contains('ycp-week-hidden')) {
+                        block.classList.remove('ycp-week-hidden');
+                        revealed++;
+                    }
+                }
+                // If no more hidden, remove the button
+                const hasHidden = blocks.some(b => b.classList.contains('ycp-week-hidden'));
+                if (!hasHidden) {
+                    const container = wrapper.querySelector('.ycp-weekly-show-more');
+                    if (container) container.remove();
+                }
+            });
+        });
+    }
+
+    // Initialize weekly floor behavior immediately
+    initWeeklyFloorShowMore();
+
     if (datePicker && resultsContainer) {
         // Get today's date in YYYY-MM-DD format for default selection
         const today = new Date();

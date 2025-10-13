@@ -1154,6 +1154,13 @@ html, body {
 .ycp-weekly-floor-table td { color: #ffffff !important; border: 1px solid rgba(255,255,255,0.5) !important; }
 .ycp-weekly-floor-table thead th { background: rgba(255,255,255,0.06) !important; }
 
+/* Weekly floor – grouping and show more */
+.ycp-weekly-floor-wrapper { width: 100%; }
+.ycp-week-block { margin-bottom: 28px; }
+.ycp-week-hidden { display: none; }
+.ycp-weekly-show-more { text-align: center; padding: 10px 0 20px; }
+.ycp-weekly-show-more .ycp-show-all-button { width: auto; margin: 0 auto; }
+
 /* Compact Availability Display Styles */
 .ycp-availability-compact {
     font-family: Arial, sans-serif;

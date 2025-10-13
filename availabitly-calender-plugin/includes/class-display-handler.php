@@ -56,13 +56,18 @@ class YCP_Display_Handler {
         if (function_exists('wp_enqueue_style')) {
             wp_enqueue_style('ycp-style');
         }
+        if (function_exists('wp_enqueue_script')) {
+            // Reuse existing frontend script; safe on pages without calendar
+            wp_enqueue_script('ycp-script');
+        }
 
         $atts = shortcode_atts([
             'floor_id' => 0,
+            'floor' => 0,
             'weeks' => 1,
         ], $atts, 'ycp_weekly_floor');
 
-        $floor_id = absint($atts['floor_id']);
+        $floor_id = absint($atts['floor_id'] ? $atts['floor_id'] : $atts['floor']);
         $weeks = max(1, (int) $atts['weeks']);
 
         if ($floor_id <= 0) {
@@ -83,7 +88,13 @@ class YCP_Display_Handler {
         $now = new \DateTime('now', $tz);
         $weekStart = (clone $now)->modify('monday this week')->setTime(0, 0, 0);
 
-        $output = '';
+        // Determine initial visible weeks: show up to 3 if more are requested, otherwise all
+        $initial_visible = ($weeks > 3) ? 3 : $weeks;
+
+        // Unique wrapper per instance to support multiple shortcodes on same page
+        $instance_id = 'ycp-weekly-floor-' . wp_generate_uuid4();
+
+        $output = '<div id="' . esc_attr($instance_id) . '" class="ycp-weekly-floor-wrapper" data-total-weeks="' . (int) $weeks . '" data-initial-visible="' . (int) $initial_visible . '">';
 
         for ($w = 0; $w < $weeks; $w++) {
             $start = (clone $weekStart)->modify("+{$w} week");
@@ -129,11 +140,14 @@ class YCP_Display_Handler {
                 esc_html(wp_date('d.m.Y', $end->getTimestamp(), $tz))
             );
 
+            // Wrap each week's table in a block so we can show/hide in chunks of 3
+            $week_classes = 'ycp-week-block' . ($w >= $initial_visible ? ' ycp-week-hidden' : '');
+            $output .= '<div class="' . $week_classes . '">';
             $output .= '<div class="ycp-weekly-floor">';
             $output .= '<div class="ycp-calendar-header"><h3>' . $header . '</h3></div>';
             $output .= '<table class="ycp-weekly-floor-table">';
             $output .= '<thead><tr>'
-                . '<th>' . esc_html__('Lady', self::TEXT_DOMAIN) . '</th>'
+                . '<th>' . esc_html__('Crew', self::TEXT_DOMAIN) . '</th>'
                 . '<th>' . esc_html__('Mo', self::TEXT_DOMAIN) . '</th>'
                 . '<th>' . esc_html__('Di', self::TEXT_DOMAIN) . '</th>'
                 . '<th>' . esc_html__('Mi', self::TEXT_DOMAIN) . '</th>'
@@ -156,11 +170,21 @@ class YCP_Display_Handler {
                     $output .= '</tr>';
                 }
             }
-            $output .= '</tbody></table></div>';
+            $output .= '</tbody></table></div></div>';
         }
+        // Add Show More button if there are hidden weeks
+        if ($weeks > $initial_visible) {
+            $output .= '<div class="ycp-weekly-show-more">'
+                . '<button type="button" class="ycp-show-all-button" aria-expanded="false">' . esc_html__('MEHR ANZEIGEN', self::TEXT_DOMAIN) . '</button>'
+                . '</div>';
+        }
+
+        $output .= '</div>';
 
         return $output;
     }
+
+    // Alias renderer removed; only ycp_weekly_floor is supported
     
     /**
      * Render calendar shortcode
