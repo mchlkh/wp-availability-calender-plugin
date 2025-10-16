@@ -100,32 +100,37 @@ class YCP_Display_Handler {
             $start = (clone $weekStart)->modify("+{$w} week");
             $end = (clone $start)->modify('+6 days');
 
+			// Determine if this loop iteration is the current week and capture today's DOW (1..7)
+			$is_current_week = ($now >= $start && $now <= $end);
+			$today_dow = (int) $now->format('N');
+
             // Query availability for this floor and date range
             $availability_table = $wpdb->prefix . 'ycp_availability';
             $professionals_table = $wpdb->prefix . 'ycp_professionals';
-            $sql = $wpdb->prepare(
-                "SELECT a.date, a.professional_id, a.room, p.name, p.display_order
-                 FROM $availability_table a
-                 INNER JOIN $professionals_table p ON p.id = a.professional_id
-                 WHERE a.floor = %s AND a.date BETWEEN %s AND %s
-                 ORDER BY p.display_order ASC, p.name ASC",
-                $floor_name,
-                $start->format('Y-m-d'),
-                $end->format('Y-m-d')
-            );
+			$sql = $wpdb->prepare(
+				"SELECT a.date, a.professional_id, a.room, p.name, p.display_order, p.profile_url
+				 FROM $availability_table a
+				 INNER JOIN $professionals_table p ON p.id = a.professional_id
+				 WHERE a.floor = %s AND a.date BETWEEN %s AND %s
+				 ORDER BY p.display_order ASC, p.name ASC",
+				$floor_name,
+				$start->format('Y-m-d'),
+				$end->format('Y-m-d')
+			);
             $rows = $wpdb->get_results($sql, ARRAY_A) ?: [];
 
             // Build rows grouped by professional
             $byPro = [];
             foreach ($rows as $row) {
                 $proId = (int) $row['professional_id'];
-                if (!isset($byPro[$proId])) {
-                    $byPro[$proId] = [
-                        'name' => (string) $row['name'],
-                        // 1..7 => bool
-                        'days' => [1=>false,2=>false,3=>false,4=>false,5=>false,6=>false,7=>false],
-                    ];
-                }
+				if (!isset($byPro[$proId])) {
+					$byPro[$proId] = [
+						'name' => (string) $row['name'],
+						'url' => isset($row['profile_url']) ? (string) $row['profile_url'] : '',
+						// 1..7 => bool
+						'days' => [1=>false,2=>false,3=>false,4=>false,5=>false,6=>false,7=>false],
+					];
+				}
                 $date = (string) $row['date'];
                 $dow = (int) (new \DateTime($date, $tz))->format('N');
                 $byPro[$proId]['days'][$dow] = true; // do not dedupe count; dot is presence
@@ -161,14 +166,27 @@ class YCP_Display_Handler {
             if (empty($byPro)) {
                 $output .= '<tr><td colspan="8" class="ycp-empty">' . esc_html__('Keine Einträge für diese Woche.', self::TEXT_DOMAIN) . '</td></tr>';
             } else {
-                foreach ($byPro as $pro) {
-                    $output .= '<tr>';
-                    $output .= '<td class="ycp-col-name">' . esc_html($pro['name']) . '</td>';
-                    for ($d = 1; $d <= 7; $d++) {
-                        $output .= '<td class="ycp-col-day">' . ($pro['days'][$d] ? '<span class="ycp-dot" aria-hidden="true"></span>' : '') . '</td>';
-                    }
-                    $output .= '</tr>';
-                }
+				foreach ($byPro as $pro) {
+					$output .= '<tr>';
+					$nameHtml = esc_html($pro['name']);
+					if (!empty($pro['url'])) {
+						$url = esc_url((string) $pro['url']);
+						$nameHtml = '<a href="' . $url . '">' . $nameHtml . '</a>';
+					}
+					$output .= '<td class="ycp-col-name">' . $nameHtml . '</td>';
+					for ($d = 1; $d <= 7; $d++) {
+						if ($pro['days'][$d]) {
+							$dotClass = 'ycp-dot';
+							if ($is_current_week && $d === $today_dow) {
+								$dotClass .= ' ycp-dot-today';
+							}
+							$output .= '<td class="ycp-col-day"><span class="' . $dotClass . '" aria-hidden="true"></span></td>';
+						} else {
+							$output .= '<td class="ycp-col-day"></td>';
+						}
+					}
+					$output .= '</tr>';
+				}
             }
             $output .= '</tbody></table></div></div>';
         }

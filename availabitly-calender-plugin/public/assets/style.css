@@ -1137,6 +1137,8 @@ html, body {
 .ycp-weekly-floor-table thead th { background: rgba(255,255,255,0.06); font-weight: 600; }
 .ycp-weekly-floor-table .ycp-empty { text-align: center; opacity: 0.85; }
 .ycp-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: currentColor; opacity: 0.9; }
+/* Current day dot highlight */
+.ycp-dot-today { background: #2ee64e !important; }
 
 /* Mobile optimizations: keep weekday headers on one line and preserve dots visibility */
 @media (max-width: 480px) {
@@ -1146,6 +1148,7 @@ html, body {
     .ycp-weekly-floor-table th:not(:first-child), .ycp-weekly-floor-table td:not(:first-child) { width: calc(55% / 7); min-width: 36px; text-align: center; }
     .ycp-col-name { overflow: hidden; text-overflow: ellipsis; }
     .ycp-dot { width: 8px; height: 8px; }
+    .ycp-dot-today { box-shadow: 0 0 0 1.5px rgba(46,230,78,0.25); }
 }
 
 /* Force weekly floor table to use white text and white lines */
